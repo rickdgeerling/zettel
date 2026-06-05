@@ -104,10 +104,10 @@ Use `zettel write index` to save the index.
 
 ## Incremental Strategy
 
-1. Read last run date: `cat ~/.zettel/.last-organize 2>/dev/null`
+1. Read last run date: `cat $(zettel store-path --quiet)/.last-organize 2>/dev/null`
 2. If the file exists, only process cards where frontmatter `modified` >= that date, plus their linked neighbors
 3. If the file doesn't exist, this is the first run — process all cards
-4. After completing all checks, write today's date: `echo "YYYY-MM-DD" > ~/.zettel/.last-organize` (use actual date)
+4. After completing all checks, write today's date: `echo "YYYY-MM-DD" > $(zettel store-path --quiet)/.last-organize` (use actual date)
 
 When the organize skill creates new cards (e.g., splitting hubs), use `source: organize` in the frontmatter.
 

@@ -20,6 +20,12 @@ cat card.md | zettel write my-card
 # Write with --body flag
 zettel write my-card --body "$(cat card.md)"
 
+# Initialize a store in the current directory
+zettel init
+
+# Show resolved store path
+zettel store-path
+
 # Search
 zettel search "jwt"
 
@@ -37,6 +43,10 @@ zettel archive my-card
 
 # Start MCP server
 zettel serve
+
+# Common flags
+zettel --store /path/to/store search "token"     # use specific store
+zettel --quiet read my-card                       # suppress store path log
 ```
 
 ## MCP Server
@@ -48,7 +58,7 @@ Add to your MCP client config (e.g., Claude Desktop):
   "mcpServers": {
     "zettel": {
       "command": "zettel",
-      "args": ["serve"]
+      "args": ["--quiet", "serve"]
     }
   }
 }
@@ -63,7 +73,32 @@ Available tools:
 
 ## Storage
 
-Cards are stored as Markdown files in `~/.zettel/cards/`. Archived cards are in `~/.zettel/archived/`.
+Cards are stored as Markdown files with YAML frontmatter. Store discovery follows this precedence:
+
+1. `--store` flag (e.g., `--store /path/to/store`) — explicit override
+2. Tree-walk from current directory — finds nearest `.zettel/` directory (like Git)
+3. `ZETTEL_HOME` environment variable — fallback when no local store exists
+
+Initialize a store in your project root with `zettel init`:
+```bash
+cd my-project
+zettel init   # creates .zettel/cards/ and .zettel/archived/
+```
+
+To use a global store as a fallback (like the old `~/.zettel` behavior), set:
+```bash
+export ZETTEL_HOME=$HOME/.zettel
+```
+
+The `--quiet` flag suppresses the store path log on stderr:
+```bash
+zettel --quiet store-path   # prints path only
+```
+
+Find the resolved store path:
+```bash
+zettel store-path   # e.g., /home/user/projects/my-app/.zettel
+```
 
 ## Development
 
