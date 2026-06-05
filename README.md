@@ -1,6 +1,6 @@
 # Zettel MCP
 
-A Go CLI and MCP server for managing a Zettelkasten memory system. Designed as long-term memory for AI agents.
+A Go CLI and MCP server for managing a Zettelkasten memory system, as an experiment for long-term memory for AI agents.
 
 ## Installation
 
