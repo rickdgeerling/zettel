@@ -17,10 +17,6 @@ type CardMetadata struct {
 }
 
 func (s *Store) SearchCards(query string, tags []string, category, status *string, limit, offset int) ([]CardMetadata, error) {
-	if query == "" && len(tags) == 0 && category == nil && status == nil {
-		return nil, nil
-	}
-
 	entries, err := os.ReadDir(s.cardsDir)
 	if err != nil {
 		return nil, err

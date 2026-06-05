@@ -46,7 +46,7 @@ func TestSearchCardsSubstringMatch(t *testing.T) {
 	}
 }
 
-func TestSearchCardsNoQueryReturnsEmpty(t *testing.T) {
+func TestSearchCardsNoFiltersReturnsAll(t *testing.T) {
 	tmp := t.TempDir()
 	s, _ := Init(tmp)
 
@@ -57,8 +57,8 @@ func TestSearchCardsNoQueryReturnsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchCards failed: %v", err)
 	}
-	if len(results) != 0 {
-		t.Errorf("Expected empty results for no query, got %d", len(results))
+	if len(results) != 1 {
+		t.Errorf("Expected 1 result for no-filter search, got %d", len(results))
 	}
 }
 
