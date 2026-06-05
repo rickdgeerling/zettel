@@ -19,9 +19,8 @@ var (
 var searchCmd = &cobra.Command{
 	Use:   "search <query>",
 	Short: "Search cards by substring match and metadata filters",
-	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		query := args[0]
+		query := strings.Join(args, " ")
 
 		var catArg, statusArg *string
 		if searchCategory != "" {
