@@ -120,8 +120,13 @@ func TestWriteCardMissingCreated(t *testing.T) {
 	}
 
 	err := s.WriteCard("missing-created", card, "cli")
-	if err == nil {
-		t.Error("Expected error for missing created, got nil")
+	if err != nil {
+		t.Fatalf("WriteCard failed: %v", err)
+	}
+
+	parsed, _ := s.ReadCard("missing-created")
+	if parsed.Created.IsZero() {
+		t.Error("Created was not auto-set")
 	}
 }
 

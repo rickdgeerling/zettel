@@ -43,12 +43,12 @@ func (s *Store) WriteCard(slug string, card *Card, source string) error {
 		return fmt.Errorf("title is required")
 	}
 	if card.Created.IsZero() {
-		return fmt.Errorf("created is required")
+		card.Created = time.Now().Truncate(time.Second)
+	}
+	if card.Modified.IsZero() {
+		card.Modified = time.Now().Truncate(time.Second)
 	}
 
-	if card.Modified.IsZero() {
-		card.Modified = time.Now().UTC()
-	}
 	if card.Source == "" {
 		card.Source = source
 	}
