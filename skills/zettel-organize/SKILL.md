@@ -20,6 +20,7 @@ Two equivalent interfaces exist — use whichever your environment supports:
 | `zettel links`                        | `zettel_links` with no args                 |
 | `zettel links <slug>`                 | `zettel_links` with slug arg                |
 | `zettel archive <slug>`               | `zettel_archive` with slug arg              |
+| `zettel store_path`                   | `zettel_store_path`                         |
 
 The rest of this skill uses CLI syntax for brevity. Substitute MCP tool calls if CLI is unavailable.
 
@@ -107,7 +108,7 @@ Use `zettel write index` to save the index.
 1. Read last run date: `cat $(zettel store-path --quiet)/.last-organize 2>/dev/null`
 2. If the file exists, only process cards where frontmatter `modified` >= that date, plus their linked neighbors
 3. If the file doesn't exist, this is the first run — process all cards
-4. After completing all checks, write today's date: `echo "YYYY-MM-DD" > $(zettel store-path --quiet)/.last-organize` (use actual date)
+4. After completing all checks, write today's date to `$(zettel store-path --quiet)/.last-organize` (use actual date)
 
 When the organize skill creates new cards (e.g., splitting hubs), use `source: organize` in the frontmatter.
 
