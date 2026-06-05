@@ -29,6 +29,7 @@ func init() {
 	rootCmd.AddCommand(linksCmd)
 	rootCmd.AddCommand(archiveCmd)
 	rootCmd.AddCommand(serveCmd)
+	rootCmd.AddCommand(storePathCmd)
 }
 
 var rootCmd = &cobra.Command{
