@@ -22,6 +22,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flagStore, "store", "", "Path to zettel store (overrides discovery)")
 	rootCmd.PersistentFlags().BoolVar(&flagQuiet, "quiet", false, "Suppress store path log")
 
+	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(searchCmd)
 	rootCmd.AddCommand(readCmd)
 	rootCmd.AddCommand(writeCmd)
@@ -35,6 +36,13 @@ var rootCmd = &cobra.Command{
 	Short: "Zettelkasten memory system for AI agents",
 	Long:  `A CLI and MCP server for managing Markdown-based knowledge cards with YAML frontmatter.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// init creates the store it needs — skip discovery.
+		// Note: Setting PersistentPreRun on initCmd to a no-op would NOT work
+		// because Cobra chains PersistentPreRun (parent runs first, then child).
+		// The parent's store resolution would run first and fail.
+		if cmd.Name() == "init" {
+			return
+		}
 		cwd, err := os.Getwd()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: cannot determine current directory: %v\n", err)
