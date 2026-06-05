@@ -18,7 +18,7 @@ func TestSearchCardsSubstringMatch(t *testing.T) {
 		_ = s.WriteCard(c.Slug, c, "test")
 	}
 
-	results, err := s.SearchCards("jwt", nil, nil, nil)
+	results, err := s.SearchCards("jwt", nil, nil, nil, 0, 0)
 	if err != nil {
 		t.Fatalf("SearchCards failed: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestSearchCardsSubstringMatch(t *testing.T) {
 		t.Errorf("Wrong slug: got %q", results[0].Slug)
 	}
 
-	results, err = s.SearchCards("docker", nil, nil, nil)
+	results, err = s.SearchCards("docker", nil, nil, nil, 0, 0)
 	if err != nil {
 		t.Fatalf("SearchCards failed: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestSearchCardsSubstringMatch(t *testing.T) {
 		t.Errorf("Wrong results for 'docker': %v", results)
 	}
 
-	results, err = s.SearchCards("token", nil, nil, nil)
+	results, err = s.SearchCards("token", nil, nil, nil, 0, 0)
 	if err != nil {
 		t.Fatalf("SearchCards failed: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestSearchCardsNoQueryReturnsEmpty(t *testing.T) {
 	card := &Card{Slug: "some-card", Title: "Test", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "Content"}
 	_ = s.WriteCard("some-card", card, "test")
 
-	results, err := s.SearchCards("", nil, nil, nil)
+	results, err := s.SearchCards("", nil, nil, nil, 0, 0)
 	if err != nil {
 		t.Fatalf("SearchCards failed: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestSearchCardsTagFilter(t *testing.T) {
 		_ = s.WriteCard(c.Slug, c, "test")
 	}
 
-	results, err := s.SearchCards("", []string{"security"}, nil, nil)
+	results, err := s.SearchCards("", []string{"security"}, nil, nil, 0, 0)
 	if err != nil {
 		t.Fatalf("SearchCards failed: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestSearchCardsCategoryFilter(t *testing.T) {
 		_ = s.WriteCard(c.Slug, c, "test")
 	}
 
-	results, err := s.SearchCards("", nil, ptrString("backend"), nil)
+	results, err := s.SearchCards("", nil, ptrString("backend"), nil, 0, 0)
 	if err != nil {
 		t.Fatalf("SearchCards failed: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestSearchCardsStatusFilter(t *testing.T) {
 		_ = s.WriteCard(c.Slug, c, "test")
 	}
 
-	results, err := s.SearchCards("", nil, nil, ptrString("conflict"))
+	results, err := s.SearchCards("", nil, nil, ptrString("conflict"), 0, 0)
 	if err != nil {
 		t.Fatalf("SearchCards failed: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestSearchCardsAndLogic(t *testing.T) {
 		_ = s.WriteCard(c.Slug, c, "test")
 	}
 
-	results, err := s.SearchCards("content", []string{"security"}, ptrString("backend"), nil)
+	results, err := s.SearchCards("content", []string{"security"}, ptrString("backend"), nil, 0, 0)
 	if err != nil {
 		t.Fatalf("SearchCards failed: %v", err)
 	}
@@ -155,12 +155,118 @@ func TestSearchCardsArchivedNotIncluded(t *testing.T) {
 	_ = s.WriteCard("archived-search", card, "test")
 	_ = s.ArchiveCard("archived-search")
 
-	results, err := s.SearchCards("archived", nil, nil, nil)
+	results, err := s.SearchCards("archived", nil, nil, nil, 0, 0)
 	if err != nil {
 		t.Fatalf("SearchCards failed: %v", err)
 	}
 	if len(results) != 0 {
 		t.Errorf("Expected no results for archived card, got %d", len(results))
+	}
+}
+
+func TestSearchCardsLimit(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	cards := []*Card{
+		{Slug: "card-1", Title: "Card One", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "test content"},
+		{Slug: "card-2", Title: "Card Two", Created: time.Date(2025, 1, 16, 0, 0, 0, 0, time.UTC), Body: "test content"},
+		{Slug: "card-3", Title: "Card Three", Created: time.Date(2025, 1, 17, 0, 0, 0, 0, time.UTC), Body: "test content"},
+	}
+	for _, c := range cards {
+		_ = s.WriteCard(c.Slug, c, "test")
+	}
+
+	results, err := s.SearchCards("test", nil, nil, nil, 2, 0)
+	if err != nil {
+		t.Fatalf("SearchCards failed: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("Expected 2 results with limit=2, got %d", len(results))
+	}
+}
+
+func TestSearchCardsOffset(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	cards := []*Card{
+		{Slug: "card-1", Title: "Card One", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "test content"},
+		{Slug: "card-2", Title: "Card Two", Created: time.Date(2025, 1, 16, 0, 0, 0, 0, time.UTC), Body: "test content"},
+		{Slug: "card-3", Title: "Card Three", Created: time.Date(2025, 1, 17, 0, 0, 0, 0, time.UTC), Body: "test content"},
+	}
+	for _, c := range cards {
+		_ = s.WriteCard(c.Slug, c, "test")
+	}
+
+	results, err := s.SearchCards("test", nil, nil, nil, 0, 1)
+	if err != nil {
+		t.Fatalf("SearchCards failed: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("Expected 2 results with offset=1 (skipping 1 of 3), got %d", len(results))
+	}
+}
+
+func TestSearchCardsOffsetBeyondResults(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	card := &Card{Slug: "only-card", Title: "Only", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "test"}
+	_ = s.WriteCard("only-card", card, "test")
+
+	results, err := s.SearchCards("test", nil, nil, nil, 0, 5)
+	if err != nil {
+		t.Fatalf("SearchCards failed: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("Expected 0 results when offset >= total, got %d", len(results))
+	}
+}
+
+func TestSearchCardsLimitAndOffset(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	cards := []*Card{
+		{Slug: "card-1", Title: "One", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "test"},
+		{Slug: "card-2", Title: "Two", Created: time.Date(2025, 1, 16, 0, 0, 0, 0, time.UTC), Body: "test"},
+		{Slug: "card-3", Title: "Three", Created: time.Date(2025, 1, 17, 0, 0, 0, 0, time.UTC), Body: "test"},
+		{Slug: "card-4", Title: "Four", Created: time.Date(2025, 1, 18, 0, 0, 0, 0, time.UTC), Body: "test"},
+		{Slug: "card-5", Title: "Five", Created: time.Date(2025, 1, 19, 0, 0, 0, 0, time.UTC), Body: "test"},
+	}
+	for _, c := range cards {
+		_ = s.WriteCard(c.Slug, c, "test")
+	}
+
+	// Page 1: offset=0, limit=2 -> slugs 1,2
+	results, err := s.SearchCards("test", nil, nil, nil, 2, 0)
+	if err != nil {
+		t.Fatalf("Page 1 failed: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("Page 1: expected 2 results, got %d", len(results))
+	}
+
+	// Page 2: offset=2, limit=2 -> slugs 3,4
+	results, err = s.SearchCards("test", nil, nil, nil, 2, 2)
+	if err != nil {
+		t.Fatalf("Page 2 failed: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("Page 2: expected 2 results, got %d", len(results))
+	}
+
+	// Page 3: offset=4, limit=2 -> slugs 5
+	results, err = s.SearchCards("test", nil, nil, nil, 2, 4)
+	if err != nil {
+		t.Fatalf("Page 3 failed: %v", err)
+	}
+	if len(results) != 1 {
+		t.Errorf("Page 3: expected 1 result, got %d", len(results))
+	}
+	if results[0].Slug != "card-5" {
+		t.Errorf("Page 3: expected card-5, got %s", results[0].Slug)
 	}
 }
 

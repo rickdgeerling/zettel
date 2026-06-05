@@ -57,11 +57,13 @@ func (z *ZettelServer) handleTool(ctx context.Context, request mcp.CallToolReque
 
 func (z *ZettelServer) makeSearchTool() server.ServerTool {
 	tool := mcp.NewTool("zettel_search",
-		mcp.WithDescription("Search cards by substring query with optional metadata filters"),
+		mcp.WithDescription("Search cards by substring query with optional metadata filters and pagination"),
 		mcp.WithString("query", mcp.Title("Query"), mcp.Description("Substring search query"), mcp.Required()),
 		mcp.WithString("tag", mcp.Title("Tag"), mcp.Description("Filter by tag (single)")),
 		mcp.WithString("category", mcp.Title("Category"), mcp.Description("Filter by category")),
 		mcp.WithString("status", mcp.Title("Status"), mcp.Description("Filter by status")),
+		mcp.WithNumber("limit", mcp.Title("Limit"), mcp.Description("Max results to return (0 = unlimited)")),
+		mcp.WithNumber("offset", mcp.Title("Offset"), mcp.Description("Skip N results (for pagination)")),
 	)
 	return server.ServerTool{
 		Tool:    tool,
@@ -114,6 +116,22 @@ func (z *ZettelServer) makeArchiveTool() server.ServerTool {
 	}
 }
 
+func getIntArg(argsMap map[string]any, key string) int {
+	v, ok := argsMap[key]
+	if !ok {
+		return 0
+	}
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	case int64:
+		return int(n)
+	}
+	return 0
+}
+
 func (z *ZettelServer) handleSearch(args any) (*mcp.CallToolResult, error) {
 	argsMap, ok := args.(map[string]any)
 	if !ok {
@@ -140,7 +158,9 @@ func (z *ZettelServer) handleSearch(args any) (*mcp.CallToolResult, error) {
 		status = &s
 	}
 
-	results, err := z.store.SearchCards(query, tags, category, status)
+	limit, offset := getIntArg(argsMap, "limit"), getIntArg(argsMap, "offset")
+
+	results, err := z.store.SearchCards(query, tags, category, status, limit, offset)
 	if err != nil {
 		return errorResult(fmt.Sprintf("Search failed: %v", err)), nil
 	}
@@ -160,6 +180,10 @@ func (z *ZettelServer) handleSearch(args any) (*mcp.CallToolResult, error) {
 		line := fmt.Sprintf("%s | %s%s | cat=%s | status=%s | created=%s modified=%s",
 			r.Slug, r.Title, tagsStr, r.Category, r.Status, r.Created, r.Modified)
 		lines = append(lines, line)
+	}
+
+	if limit > 0 && len(results) == limit {
+		lines = append(lines, fmt.Sprintf("(showing %d results, use offset %d for more)", limit, offset+limit))
 	}
 
 	return &mcp.CallToolResult{

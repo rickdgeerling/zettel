@@ -16,7 +16,7 @@ type CardMetadata struct {
 	Modified string
 }
 
-func (s *Store) SearchCards(query string, tags []string, category, status *string) ([]CardMetadata, error) {
+func (s *Store) SearchCards(query string, tags []string, category, status *string, limit, offset int) ([]CardMetadata, error) {
 	if query == "" && len(tags) == 0 && category == nil && status == nil {
 		return nil, nil
 	}
@@ -56,6 +56,17 @@ func (s *Store) SearchCards(query string, tags []string, category, status *strin
 			Created:  card.Created.Format("2006-01-02"),
 			Modified: card.Modified.Format("2006-01-02"),
 		})
+	}
+
+	// Apply pagination
+	if offset > 0 {
+		if offset >= len(results) {
+			return nil, nil
+		}
+		results = results[offset:]
+	}
+	if limit > 0 && limit < len(results) {
+		results = results[:limit]
 	}
 
 	return results, nil
