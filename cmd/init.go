@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/rickdgeerling/zettel/internal/store"
 	"github.com/spf13/cobra"
-	"github.com/user/zettel-mcp/internal/store"
 )
 
 var initCmd = &cobra.Command{

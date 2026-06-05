@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/user/zettel-mcp/cmd"
+	"github.com/rickdgeerling/zettel/cmd"
 )
 
 func main() {

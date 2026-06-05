@@ -8,7 +8,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/user/zettel-mcp/internal/store"
+	"github.com/rickdgeerling/zettel/internal/store"
 )
 
 type ZettelServer struct {

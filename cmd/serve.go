@@ -1,8 +1,8 @@
 package cmd
 
 import (
+	"github.com/rickdgeerling/zettel/internal/mcp"
 	"github.com/spf13/cobra"
-	"github.com/user/zettel-mcp/internal/mcp"
 )
 
 var serveCmd = &cobra.Command{

@@ -5,8 +5,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/rickdgeerling/zettel/internal/store"
 	"github.com/spf13/cobra"
-	"github.com/user/zettel-mcp/internal/store"
 )
 
 var writeBody string
