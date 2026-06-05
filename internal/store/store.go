@@ -6,6 +6,11 @@ import (
 	"path/filepath"
 )
 
+const (
+	CardsDirName    = "cards"
+	ArchivedDirName = "archived"
+)
+
 type Store struct {
 	Root     string
 	cardsDir string
@@ -13,8 +18,8 @@ type Store struct {
 }
 
 func Init(root string) (*Store, error) {
-	cardsDir := filepath.Join(root, "cards")
-	archivedDir := filepath.Join(root, "archived")
+	cardsDir := filepath.Join(root, CardsDirName)
+	archivedDir := filepath.Join(root, ArchivedDirName)
 
 	for _, dir := range []string{cardsDir, archivedDir} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -27,12 +32,4 @@ func Init(root string) (*Store, error) {
 		cardsDir: cardsDir,
 		archDir:  archivedDir,
 	}, nil
-}
-
-func DefaultStore() (*Store, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("cannot find home directory: %w", err)
-	}
-	return Init(filepath.Join(home, ".zettel"))
 }
