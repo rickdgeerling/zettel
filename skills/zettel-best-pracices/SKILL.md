@@ -189,7 +189,7 @@ source: organize
 - [[docker-multi-stage-builds]] — Reducing image size with build stages
 ```
 
-The index is maintained by the `zettel-organize` skill. You can also update it manually after writing cards.
+The index is maintained by the `zettel-organize` skill during periodic maintenance. You MUST also update it manually after writing each new card — do not wait for the next organize run. Add newly created cards under the appropriate category so the `zettel-recall` skill can find them.
 
 ## The Recall → Work → Retro Loop
 
@@ -262,7 +262,7 @@ When importing notes from external tools like Obsidian, the bar is **higher** th
 | ----------------------------------------- | -------------------------------------------------------- |
 | Write a card for every task               | Only capture non-obvious insights                        |
 | Copy-paste error messages as cards        | Distill the root cause and fix                           |
-| Create cards with no links                | Always link to at least one related card                 |
+| Create card without adding to index    | Always add new cards to the index under the appropriate category |
 | Use vague slugs like `notes` or `misc`    | Use descriptive slugs: `postgres-connection-pool-sizing` |
 | Write essay-length cards                  | Keep cards atomic — split if needed                      |
 | Hoard tags (5+ per card)                  | Use 1–3 tags: one domain + one type                      |

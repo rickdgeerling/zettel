@@ -40,7 +40,8 @@ digraph retro {
     "Update existing card (append new info)" -> "zettel write <existing-card>";
     "Write new card with [[links]]" -> "zettel write <new-card>";
     "zettel write <existing-card>" -> "More insights?" [shape=diamond];
-    "zettel write <new-card>" -> "More insights?" [shape=diamond];
+    "zettel write <new-card>" -> "Add to index";
+    "Add to index" -> "More insights?" [shape=diamond];
     "More insights?" -> "For each insight: draft atomic card" [label="yes"];
     "More insights?" -> "Done" [label="no"];
 }
@@ -57,6 +58,7 @@ digraph retro {
 5. Before writing, `zettel search` for related existing cards
 6. **Dedup check**: If an existing card already covers this insight, `zettel read` it, then update it by appending new information (use `zettel write` with the full updated content)
 7. If it's genuinely new, write a new card with `[[links]]` to related cards in the prose
+8. **Add to index**: Read the `index` card (`zettel read index`), then write it back with the new card added under the most appropriate category. If no existing category fits, create one. Use `- [[new-slug]] — one-line description` format, consistent with the existing index entries.
 
 ## Card Format
 
@@ -88,6 +90,7 @@ Note: You do NOT need to include `modified` — the CLI auto-sets it on write.
   - Good: domain knowledge, architectural decisions, gotcha's, failure modes 
   - Bad: historical record of a bugfix, feature discussion that never landed in the product
 - **Preserve frontmatter on update**: When updating an existing card, preserve its original frontmatter fields (title, created). Only append to the body. `source` is auto-managed by the MCP server.
+- **Index on create**: Every new card must be added to the `index` card under the appropriate category. Read the current index, add a `- [[new-slug]] — one-line description` entry, and write it back. This keeps the index up to date between organize runs.
 - **Category**: Broad subject category, also used to determine its location within the index
 - **Tags**: Add 1-5 tags for the domain and type of knowledge captured in the note.
   - Good: `docker`, `redis`, `api`, `queues` and `decision`, `pattern`, `gotcha`

@@ -98,8 +98,8 @@ Rules for the index:
 - Categories should be meaningful concepts, not arbitrary groupings
 - Descriptions should be one line, explaining what the card is about (not just the title)
 - Archived cards must be removed from the index
-- New cards must be added
-- If the index grows too large (150+ notes), consider splitting into sub-index for one or more of the the larger categories. The sub-index is named `<category>-index` and follows the same template as the main index.
+- New cards should already be in the index (added at creation time by `zettel-retro`). Verify this — if any cards are missing, add them.
+- If the index grows too large (150+ notes), consider splitting into sub-index for one or more of the larger categories. The sub-index is named `<category>-index` and follows the same template as the main index.
 
 Use `zettel write index` to save the index.
 
