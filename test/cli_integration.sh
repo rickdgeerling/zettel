@@ -42,7 +42,12 @@ echo "$results" | grep -q "test-card" || { echo "Search failed"; exit 1; }
 # Links (global)
 links_output=$($ZETTEL links)
 echo "$links_output" | grep -q "test-card" || { echo "Links global failed: test-card not in graph"; exit 1; }
-echo "$links_output" | grep -q "1 inbound" || { echo "Inbound count wrong"; exit 1; }
+echo "$links_output" | grep -q "0 inbound, 1 outbound" || { echo "Inbound/outbound counts wrong: $links_output"; exit 1; }
+echo "$links_output" | grep -q "ORPHAN" || { echo "test-card should be marked ORPHAN"; exit 1; }
+
+# Broken links ([[link]] points at a card that doesn't exist)
+broken_output=$($ZETTEL links --broken)
+echo "$broken_output" | grep -q "test-card -> \[\[link\]\] (missing)" || { echo "Broken links failed: $broken_output"; exit 1; }
 
 # Archive
 $ZETTEL archive test-card
@@ -53,7 +58,8 @@ test ! -f "$PROJECT_DIR/.zettel/cards/test-card.md" || { echo "Active card not r
 output=$($ZETTEL read test-card)
 echo "$output" | grep -q "Test Card" || { echo "Read from archived failed"; exit 1; }
 
-# Archive already-archived should fail
-$ZETTEL archive test-card && { echo "Should have failed on already-archived"; exit 1; }
+# Archive already-archived is idempotent (no error)
+$ZETTEL archive test-card || { echo "Idempotent re-archive should succeed"; exit 1; }
+test -f "$PROJECT_DIR/.zettel/archived/test-card.md" || { echo "Archived card disappeared on re-archive"; exit 1; }
 
 echo "=== All CLI integration tests passed ==="
