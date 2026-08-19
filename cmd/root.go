@@ -28,6 +28,7 @@ func init() {
 	rootCmd.AddCommand(writeCmd)
 	rootCmd.AddCommand(linksCmd)
 	rootCmd.AddCommand(archiveCmd)
+	rootCmd.AddCommand(organizeCmd)
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(storePathCmd)
 }

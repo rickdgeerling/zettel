@@ -4,16 +4,19 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/rickdgeerling/zettel/internal/store"
 	"github.com/spf13/cobra"
 )
 
 var (
-	searchTag      []string
-	searchCategory string
-	searchStatus   string
-	searchLimit    int
-	searchOffset   int
+	searchTag           []string
+	searchCategory      string
+	searchStatus        string
+	searchLimit         int
+	searchOffset        int
+	searchModifiedSince string
 )
 
 var searchCmd = &cobra.Command{
@@ -22,15 +25,25 @@ var searchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		query := strings.Join(args, " ")
 
-		var catArg, statusArg *string
-		if searchCategory != "" {
-			catArg = &searchCategory
-		}
-		if searchStatus != "" {
-			statusArg = &searchStatus
+		opts := store.SearchOptions{
+			Query:    query,
+			Tags:     searchTag,
+			Category: searchCategory,
+			Status:   searchStatus,
+			Limit:    int(searchLimit),
+			Offset:   int(searchOffset),
 		}
 
-		results, err := GetStore().SearchCards(query, searchTag, catArg, statusArg, int(searchLimit), int(searchOffset))
+		if searchModifiedSince != "" {
+			since, err := time.Parse("2006-01-02", searchModifiedSince)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: invalid --modified-since date %q (use YYYY-MM-DD)\n", searchModifiedSince)
+				os.Exit(1)
+			}
+			opts.ModifiedSince = since
+		}
+
+		results, err := GetStore().Search(opts)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -62,4 +75,5 @@ func init() {
 	searchCmd.Flags().StringVarP(&searchStatus, "status", "s", "", "Filter by status")
 	searchCmd.Flags().IntVarP(&searchLimit, "limit", "l", 0, "Limit N results")
 	searchCmd.Flags().IntVarP(&searchOffset, "offset", "o", 0, "Skip N results (pagination with limit)")
+	searchCmd.Flags().StringVar(&searchModifiedSince, "modified-since", "", "Only cards modified on or after this date (YYYY-MM-DD)")
 }
