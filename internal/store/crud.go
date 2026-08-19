@@ -62,27 +62,36 @@ func (s *Store) WriteCard(slug string, card *Card, source string) error {
 	return nil
 }
 
+// ArchiveCard moves a card from active to archived. It is idempotent:
+// archiving an already-archived card is a successful no-op. A single call
+// either moves the file (via an atomic rename) or returns an error.
 func (s *Store) ArchiveCard(slug string) error {
+	if err := validateSlug(slug); err != nil {
+		return fmt.Errorf("invalid slug: %w", err)
+	}
+
 	srcPath := filepath.Join(s.cardsDir, slug+".md")
-	if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+	dstPath := filepath.Join(s.archDir, slug+".md")
+
+	srcExists := pathExists(srcPath)
+	dstExists := pathExists(dstPath)
+
+	switch {
+	case srcExists:
+		// Active copy wins. os.Rename atomically replaces any stale archive.
+		if err := os.Rename(srcPath, dstPath); err != nil {
+			return fmt.Errorf("archiving card %q: %w", slug, err)
+		}
+		return nil
+	case dstExists:
+		// Already archived — idempotent no-op.
+		return nil
+	default:
 		return fmt.Errorf("card %q not found in active cards: %w", slug, ErrCardNotFound)
 	}
+}
 
-	dstPath := filepath.Join(s.archDir, slug+".md")
-	if _, err := os.Stat(dstPath); err == nil {
-		return fmt.Errorf("card %q already archived", slug)
-	}
-
-	data, err := os.ReadFile(srcPath)
-	if err != nil {
-		return fmt.Errorf("reading card for archive: %w", err)
-	}
-	if err := os.WriteFile(dstPath, data, 0644); err != nil {
-		return fmt.Errorf("writing to archived: %w", err)
-	}
-	if err := os.Remove(srcPath); err != nil {
-		return fmt.Errorf("removing original: %w", err)
-	}
-
-	return nil
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

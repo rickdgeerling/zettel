@@ -45,7 +45,7 @@ func TestArchiveCardNotFound(t *testing.T) {
 	}
 }
 
-func TestArchiveCardAlreadyArchived(t *testing.T) {
+func TestArchiveCardAlreadyArchivedIsIdempotent(t *testing.T) {
 	tmp := t.TempDir()
 	s, _ := Init(tmp)
 
@@ -58,9 +58,41 @@ func TestArchiveCardAlreadyArchived(t *testing.T) {
 	path := filepath.Join(s.archDir, "already-archived.md")
 	_ = os.WriteFile(path, []byte(card.Marshal()), 0644)
 
-	err := s.ArchiveCard("already-archived")
-	if err == nil {
-		t.Error("Expected error for already-archived card, got nil")
+	// Archiving an already-archived card is a successful no-op.
+	if err := s.ArchiveCard("already-archived"); err != nil {
+		t.Errorf("Expected idempotent success for already-archived card, got error: %v", err)
+	}
+
+	// The archived copy must remain.
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Error("Archived card disappeared after idempotent archive")
+	}
+}
+
+func TestArchiveCardTwice(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	card := &Card{
+		Slug:    "twice",
+		Title:   "Archive Twice",
+		Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC),
+		Body:    "Content",
+	}
+	_ = s.WriteCard("twice", card, "test")
+
+	if err := s.ArchiveCard("twice"); err != nil {
+		t.Fatalf("First archive failed: %v", err)
+	}
+	if err := s.ArchiveCard("twice"); err != nil {
+		t.Errorf("Second archive should be a no-op, got error: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(s.cardsDir, "twice.md")); !os.IsNotExist(err) {
+		t.Error("Card still in active directory after two archives")
+	}
+	if _, err := os.Stat(filepath.Join(s.archDir, "twice.md")); os.IsNotExist(err) {
+		t.Error("Card not in archived directory after two archives")
 	}
 }
 
