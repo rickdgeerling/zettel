@@ -2,9 +2,12 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -26,6 +29,7 @@ func NewZettelServer(store *store.Store) *ZettelServer {
 		z.makeWriteTool(),
 		z.makeLinksTool(),
 		z.makeArchiveTool(),
+		z.makeOrganizeTool(),
 	)
 
 	return z
@@ -47,6 +51,8 @@ func (z *ZettelServer) handleTool(ctx context.Context, request mcp.CallToolReque
 		return z.handleLinks(request.Params.Arguments)
 	case "zettel_archive":
 		return z.handleArchive(request.Params.Arguments)
+	case "zettel_organize":
+		return z.handleOrganize(request.Params.Arguments)
 	default:
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{mcp.TextContent{Type: "text", Text: "Unknown tool: " + request.Params.Name}},
@@ -62,6 +68,7 @@ func (z *ZettelServer) makeSearchTool() server.ServerTool {
 		mcp.WithString("tag", mcp.Title("Tag"), mcp.Description("Filter by tag (single)")),
 		mcp.WithString("category", mcp.Title("Category"), mcp.Description("Filter by category")),
 		mcp.WithString("status", mcp.Title("Status"), mcp.Description("Filter by status")),
+		mcp.WithString("modified_since", mcp.Title("Modified Since"), mcp.Description("Only cards modified on or after this date (YYYY-MM-DD)")),
 		mcp.WithNumber("limit", mcp.Title("Limit"), mcp.Description("Max results to return (0 = unlimited)")),
 		mcp.WithNumber("offset", mcp.Title("Offset"), mcp.Description("Skip N results (for pagination)")),
 	)
@@ -96,8 +103,10 @@ func (z *ZettelServer) makeWriteTool() server.ServerTool {
 
 func (z *ZettelServer) makeLinksTool() server.ServerTool {
 	tool := mcp.NewTool("zettel_links",
-		mcp.WithDescription("Show link graph stats (global summary or per-card links)"),
+		mcp.WithDescription("Show link graph stats (global summary or per-card links), or broken links"),
 		mcp.WithString("slug", mcp.Title("Slug"), mcp.Description("Card slug (optional, omit for global graph)")),
+		mcp.WithBoolean("broken", mcp.Title("Broken"), mcp.Description("List [[wikilinks]] pointing to missing or archived cards")),
+		mcp.WithBoolean("include_archived", mcp.Title("Include Archived"), mcp.Description("Include archived cards in the global graph")),
 	)
 	return server.ServerTool{
 		Tool:    tool,
@@ -107,8 +116,19 @@ func (z *ZettelServer) makeLinksTool() server.ServerTool {
 
 func (z *ZettelServer) makeArchiveTool() server.ServerTool {
 	tool := mcp.NewTool("zettel_archive",
-		mcp.WithDescription("Move a card from active to archived"),
+		mcp.WithDescription("Move a card from active to archived (idempotent)"),
 		mcp.WithString("slug", mcp.Title("Slug"), mcp.Description("Card slug to archive"), mcp.Required()),
+	)
+	return server.ServerTool{
+		Tool:    tool,
+		Handler: z.handleTool,
+	}
+}
+
+func (z *ZettelServer) makeOrganizeTool() server.ServerTool {
+	tool := mcp.NewTool("zettel_organize",
+		mcp.WithDescription("Emit an organize report: orphans, hubs, unresolved conflicts, recently modified cards, and broken links"),
+		mcp.WithString("since", mcp.Title("Since"), mcp.Description("Only include recently modified cards since this date (YYYY-MM-DD)")),
 	)
 	return server.ServerTool{
 		Tool:    tool,
@@ -124,12 +144,55 @@ func getIntArg(argsMap map[string]any, key string) int {
 	switch n := v.(type) {
 	case float64:
 		return int(n)
+	case float32:
+		return int(n)
 	case int:
 		return n
 	case int64:
 		return int(n)
+	case int32:
+		return int(n)
+	case uint:
+		return int(n)
+	case uint64:
+		return int(n)
+	case json.Number:
+		if i, err := n.Int64(); err == nil {
+			return int(i)
+		}
+		if f, err := n.Float64(); err == nil {
+			return int(f)
+		}
+	case string:
+		// Some MCP clients/harnesses serialize numbers as strings.
+		if f, err := strconv.ParseFloat(n, 64); err == nil {
+			return int(f)
+		}
 	}
 	return 0
+}
+
+func getBoolArg(argsMap map[string]any, key string) bool {
+	v, ok := argsMap[key]
+	if !ok {
+		return false
+	}
+	switch b := v.(type) {
+	case bool:
+		return b
+	case string:
+		parsed, err := strconv.ParseBool(b)
+		return err == nil && parsed
+	}
+	return false
+}
+
+func parseDateArg(argsMap map[string]any, key string) (time.Time, error) {
+	v, ok := argsMap[key].(string)
+	if !ok || v == "" {
+		return time.Time{}, nil
+	}
+	return time.Parse("2006-01-02", v)
 }
 
 func (z *ZettelServer) handleSearch(args any) (*mcp.CallToolResult, error) {
@@ -145,22 +208,28 @@ func (z *ZettelServer) handleSearch(args any) (*mcp.CallToolResult, error) {
 		}, nil
 	}
 
-	var tags []string
+	opts := store.SearchOptions{
+		Query:  query,
+		Limit:  getIntArg(argsMap, "limit"),
+		Offset: getIntArg(argsMap, "offset"),
+	}
+
 	if t, ok := argsMap["tag"].(string); ok && t != "" {
-		tags = []string{t}
+		opts.Tags = []string{t}
 	}
-
-	var category, status *string
 	if c, ok := argsMap["category"].(string); ok && c != "" {
-		category = &c
+		opts.Category = c
 	}
-	if s, ok := argsMap["status"].(string); ok && s != "" {
-		status = &s
+	if st, ok := argsMap["status"].(string); ok && st != "" {
+		opts.Status = st
+	}
+	if since, err := parseDateArg(argsMap, "modified_since"); err != nil {
+		return errorResult(fmt.Sprintf("Invalid modified_since date (use YYYY-MM-DD): %v", err)), nil
+	} else {
+		opts.ModifiedSince = since
 	}
 
-	limit, offset := getIntArg(argsMap, "limit"), getIntArg(argsMap, "offset")
-
-	results, err := z.store.SearchCards(query, tags, category, status, limit, offset)
+	results, err := z.store.Search(opts)
 	if err != nil {
 		return errorResult(fmt.Sprintf("Search failed: %v", err)), nil
 	}
@@ -182,8 +251,8 @@ func (z *ZettelServer) handleSearch(args any) (*mcp.CallToolResult, error) {
 		lines = append(lines, line)
 	}
 
-	if limit > 0 && len(results) == limit {
-		lines = append(lines, fmt.Sprintf("(showing %d results, use offset %d for more)", limit, offset+limit))
+	if opts.Limit > 0 && len(results) == opts.Limit {
+		lines = append(lines, fmt.Sprintf("(showing %d results, use offset %d for more)", opts.Limit, opts.Offset+opts.Limit))
 	}
 
 	return &mcp.CallToolResult{
@@ -249,15 +318,48 @@ func (z *ZettelServer) handleLinks(args any) (*mcp.CallToolResult, error) {
 		return errorResult("invalid arguments"), nil
 	}
 
+	if getBoolArg(argsMap, "broken") {
+		return z.handleBrokenLinks()
+	}
+
 	slug, hasSlug := argsMap["slug"].(string)
 	if !hasSlug || slug == "" {
-		return z.handleGlobalLinks()
+		return z.handleGlobalLinks(getBoolArg(argsMap, "include_archived"))
 	}
 	return z.handleCardLinks(slug)
 }
 
-func (z *ZettelServer) handleGlobalLinks() (*mcp.CallToolResult, error) {
-	graph, err := z.store.LinkGraph()
+func (z *ZettelServer) handleBrokenLinks() (*mcp.CallToolResult, error) {
+	broken, err := z.store.BrokenLinks()
+	if err != nil {
+		return errorResult(fmt.Sprintf("BrokenLinks failed: %v", err)), nil
+	}
+
+	if len(broken) == 0 {
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{mcp.TextContent{Type: "text", Text: "No broken links"}},
+		}, nil
+	}
+
+	var lines []string
+	for _, b := range broken {
+		lines = append(lines, fmt.Sprintf("%s -> [[%s]] (%s)", b.From, b.To, b.Kind))
+	}
+	lines = append(lines, fmt.Sprintf("\nSummary: %d broken links", len(broken)))
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{mcp.TextContent{Type: "text", Text: "Broken Links:\n" + strings.Join(lines, "\n")}},
+	}, nil
+}
+
+func (z *ZettelServer) handleGlobalLinks(includeArchived bool) (*mcp.CallToolResult, error) {
+	var graph map[string]store.LinkStats
+	var err error
+	if includeArchived {
+		graph, err = z.store.LinkGraphIncludingArchived()
+	} else {
+		graph, err = z.store.LinkGraph()
+	}
 	if err != nil {
 		return errorResult(fmt.Sprintf("LinkGraph failed: %v", err)), nil
 	}
@@ -274,7 +376,9 @@ func (z *ZettelServer) handleGlobalLinks() (*mcp.CallToolResult, error) {
 	for _, s := range slugs {
 		stats := graph[s]
 		marker := ""
-		if stats.Inbound == 0 {
+		if stats.Archived {
+			marker = " (ARCHIVED)"
+		} else if stats.Inbound == 0 {
 			marker = " (ORPHAN)"
 			orphans++
 		} else if stats.Inbound >= 10 {
@@ -285,7 +389,10 @@ func (z *ZettelServer) handleGlobalLinks() (*mcp.CallToolResult, error) {
 		lines = append(lines, line)
 	}
 
-	summary := fmt.Sprintf("\nSummary: %d cards, %d orphans, %d hubs", len(graph), orphans, hubs)
+	summary := fmt.Sprintf("\nSummary: %d active cards, %d orphans, %d hubs", len(graph), orphans, hubs)
+	if includeArchived {
+		summary = fmt.Sprintf("\nSummary: %d cards (including archived), %d orphans, %d hubs", len(graph), orphans, hubs)
+	}
 	lines = append(lines, summary)
 
 	return &mcp.CallToolResult{
@@ -325,6 +432,83 @@ func (z *ZettelServer) handleArchive(args any) (*mcp.CallToolResult, error) {
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{mcp.TextContent{Type: "text", Text: fmt.Sprintf("Card %q archived successfully", slug)}},
+	}, nil
+}
+
+func (z *ZettelServer) handleOrganize(args any) (*mcp.CallToolResult, error) {
+	argsMap, ok := args.(map[string]any)
+	if !ok {
+		return errorResult("invalid arguments"), nil
+	}
+
+	since, err := parseDateArg(argsMap, "since")
+	if err != nil {
+		return errorResult(fmt.Sprintf("Invalid since date (use YYYY-MM-DD): %v", err)), nil
+	}
+
+	report, err := z.store.OrganizeReport(since)
+	if err != nil {
+		return errorResult(fmt.Sprintf("Organize report failed: %v", err)), nil
+	}
+
+	var lines []string
+	lines = append(lines, fmt.Sprintf("Organize Report\nTotal active cards: %d", report.Total))
+
+	lines = append(lines, fmt.Sprintf("\nOrphans (%d):", len(report.Orphans)))
+	if len(report.Orphans) == 0 {
+		lines = append(lines, "  (none)")
+	} else {
+		for _, slug := range report.Orphans {
+			lines = append(lines, "  "+slug)
+		}
+	}
+
+	lines = append(lines, fmt.Sprintf("\nHubs (%d):", len(report.Hubs)))
+	if len(report.Hubs) == 0 {
+		lines = append(lines, "  (none)")
+	} else {
+		for _, slug := range report.Hubs {
+			lines = append(lines, "  "+slug)
+		}
+	}
+
+	lines = append(lines, fmt.Sprintf("\nUnresolved Conflicts (%d):", len(report.Conflicts)))
+	if len(report.Conflicts) == 0 {
+		lines = append(lines, "  (none)")
+	} else {
+		for _, slug := range report.Conflicts {
+			lines = append(lines, "  "+slug)
+		}
+	}
+
+	recentHeader := fmt.Sprintf("\nRecently Modified (%d):", len(report.RecentlyModified))
+	if !since.IsZero() {
+		recentHeader = fmt.Sprintf("\nRecently Modified since %s (%d):", since.Format("2006-01-02"), len(report.RecentlyModified))
+	}
+	lines = append(lines, recentHeader)
+	if len(report.RecentlyModified) == 0 {
+		lines = append(lines, "  (none)")
+	} else {
+		for _, rc := range report.RecentlyModified {
+			neighbors := "(no links)"
+			if len(rc.Neighbors) > 0 {
+				neighbors = strings.Join(rc.Neighbors, ", ")
+			}
+			lines = append(lines, fmt.Sprintf("  %s (modified %s) — neighbors: %s", rc.Slug, rc.Modified, neighbors))
+		}
+	}
+
+	lines = append(lines, fmt.Sprintf("\nBroken Links (%d):", len(report.BrokenLinks)))
+	if len(report.BrokenLinks) == 0 {
+		lines = append(lines, "  (none)")
+	} else {
+		for _, b := range report.BrokenLinks {
+			lines = append(lines, fmt.Sprintf("  %s -> [[%s]] (%s)", b.From, b.To, b.Kind))
+		}
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{mcp.TextContent{Type: "text", Text: strings.Join(lines, "\n")}},
 	}, nil
 }
 
