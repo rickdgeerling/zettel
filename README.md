@@ -32,14 +32,29 @@ zettel search "jwt"
 # Search with filters
 zettel search "token" --tag security --category backend
 
-# List link graph
+# Search by status or modification date
+zettel search --status conflict
+zettel search --modified-since 2026-06-16
+
+# List link graph (active cards only)
 zettel links
+
+# Include archived cards in the graph
+zettel links --include-archived
+
+# List broken links (wikilinks pointing to missing/archived cards)
+zettel links --broken
 
 # Per-card links
 zettel links my-card
 
-# Archive
+# Organize report (orphans, hubs, conflicts, recently modified, broken links)
+zettel organize
+zettel organize --since 2026-06-16
+
+# Archive (idempotent)
 zettel archive my-card
+zettel archive --dry-run my-card
 
 # Start MCP server
 zettel serve
@@ -65,11 +80,12 @@ Add to your MCP client config (e.g., Claude Desktop):
 ```
 
 Available tools:
-- `zettel_search` — search with optional query, tag, category, status filters
+- `zettel_search` — search with optional query, tag, category, status, and modified_since filters
 - `zettel_read` — read a card by slug
 - `zettel_write` — create/update a card
-- `zettel_links` — global link graph or per-card links
-- `zettel_archive` — move a card to archive
+- `zettel_links` — global link graph, per-card links, or broken links
+- `zettel_organize` — organize report (orphans, hubs, conflicts, recently modified, broken links)
+- `zettel_archive` — move a card to archive (idempotent)
 
 ## Storage
 
