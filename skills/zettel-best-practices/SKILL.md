@@ -15,8 +15,9 @@ This is NOT a workflow skill (see `zettel-recall`, `zettel-retro`, `zettel-organ
 Before writing a card, verify:
 
 - [ ] **Atomic** — one insight per card. If you can split it, do.
-- [ ] **Own words** — distill and rephrase, don't copy-paste. This is the Feynman method: if you can't explain it simply, you don't understand it well enough.
-- [ ] **Non-obvious** — would this change how you approach a similar task in the future? If not, skip it.
+- [ ] **Own words** — distill and rephrase, don't copy-paste.
+- [ ] **Transferable** — would this insight save you time in a *different* file or project?
+- [ ] **High Entropy** — does this card explain a "Why" (Rationale) or "Why not" (Constraint) rather than just a "What" (Description)?
 - [ ] **Linked in context** — `[[wikilinks]]` are embedded in sentences explaining _why_ the relationship exists.
 
 ## Card Format
@@ -260,14 +261,14 @@ When importing notes from external tools like Obsidian, the bar is **higher** th
 
 | ❌ Don't                                  | ✅ Do Instead                                            |
 | ----------------------------------------- | -------------------------------------------------------- |
-| Write a card for every task               | Only capture non-obvious insights                        |
+| Write a card for every task               | Only capture transferable, high-entropy insights         |
+| Record mechanical "toil" (field updates)  | Record the rationale for the change                      |
+| Record actions (Events)                   | Record rules and constraints (Knowledge)                 |
 | Copy-paste error messages as cards        | Distill the root cause and fix                           |
-| Create card without adding to index    | Always add new cards to the index under the appropriate category |
-| Use vague slugs like `notes` or `misc`    | Use descriptive slugs: `postgres-connection-pool-sizing` |
+| Create card without adding to index       | Always add new cards to the index under category         |
+| Use vague slugs like `notes` or `misc`    | Use descriptive slugs: `postgres-pool-sizing`            |
 | Write essay-length cards                  | Keep cards atomic — split if needed                      |
-| Hoard tags (5+ per card)                  | Use 1–3 tags: one domain + one type                      |
 | Link without explaining why               | Every `[[link]]` needs a surrounding sentence            |
-| Mechanical 1:1 import from external tools | Digest and curate — external notes are raw material      |
 
 ## Quick Reference Card
 

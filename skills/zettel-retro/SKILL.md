@@ -47,10 +47,11 @@ digraph retro {
 }
 ```
 
-1. Ask yourself: what did I learn from this task that would be useful in the future?
-2. If nothing worth remembering, skip — not every task produces insights
-3. For each insight, draft an **atomic card** (one insight per card)
-4. **Fact Hygiene Check** — before writing, scan the draft for implicit context that a stranger (or future AI) couldn't decode. Ask three questions:
+1. **The Transferability Litmus Test**: Ask yourself, "If I encountered a similar problem in a different file or project tomorrow, would this card save me time?" If no, skip it—it is low-entropy toil.
+2. If nothing worth remembering, skip — not every task produces insights.
+3. Record **Knowledge, not Events**: Focus on underlying rules, constraints, or rationale (how the system works) instead of actions (what you changed).
+4. For each insight, draft an **atomic card** (one insight per card).
+5. **Fact Hygiene Check** — before writing, scan the draft for implicit context that a stranger (or future AI) couldn't decode. Ask three questions:
    - **WHO**: Every project/product/team mentioned — is it the user's own work or external? Would a reader with zero context know?
    - **WHAT-WHEN**: Every number (days, tokens, cost) — is it bound to a specific project name and time period?
    - **RELATIONSHIP**: Words like "based on/refers to/reference" — spell out the actual relationship (authored, benchmarked against, forked from, inspired by, etc.)
@@ -86,9 +87,9 @@ Note: You do NOT need to include `modified` — the CLI auto-sets it on write.
   - Good: "This contradicts what we found in [[jwt-migration]] — stateless tokens can't be revoked."
   - Bad: "Related: [[jwt-migration]]"
 - **Slug**: English kebab-case, descriptive. e.g., `jwt-revocation-blacklist-pattern`
-- **Don't over-record**: Only save insights that would change how you approach a similar task in the future.
-  - Good: domain knowledge, architectural decisions, gotcha's, failure modes 
-  - Bad: historical record of a bugfix, feature discussion that never landed in the product
+- **Don't over-record**: Only save insights that have a "reusability horizon" beyond the current file and session.
+  - Good: domain knowledge, architectural decisions, non-obvious rationales (the "Why"), constraints (the "Why not"), patterns, gotchas.
+  - Bad: mechanical updates, "low-entropy" toil (e.g., updating field types in tests), historical records of what you changed, or information that is obvious by looking at the code.
 - **Preserve frontmatter on update**: When updating an existing card, preserve its original frontmatter fields (title, created). Only append to the body. `source` is auto-managed by the MCP server.
 - **Index on create**: Every new card must be added to the `index` card under the appropriate category. Read the current index, add a `- [[new-slug]] — one-line description` entry, and write it back. This keeps the index up to date between organize runs.
 - **Category**: Broad subject category, also used to determine its location within the index
