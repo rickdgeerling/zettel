@@ -273,3 +273,48 @@ func TestSearchCardsLimitAndOffset(t *testing.T) {
 func ptrString(s string) *string {
 	return &s
 }
+
+func TestSearchModifiedSince(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	cards := []*Card{
+		{Slug: "old-card", Title: "Old", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Modified: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC), Body: "content"},
+		{Slug: "new-card", Title: "New", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Modified: time.Date(2026, 6, 20, 0, 0, 0, 0, time.UTC), Body: "content"},
+	}
+	for _, c := range cards {
+		_ = s.WriteCard(c.Slug, c, "test")
+	}
+
+	since := time.Date(2026, 6, 16, 0, 0, 0, 0, time.UTC)
+	results, err := s.Search(SearchOptions{ModifiedSince: since})
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	if len(results) != 1 || results[0].Slug != "new-card" {
+		t.Errorf("Expected only new-card for modified-since 2026-06-16, got: %v", results)
+	}
+}
+
+func TestSearchModifiedSinceInclusiveBoundary(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	card := &Card{
+		Slug:     "boundary",
+		Title:    "Boundary",
+		Created:  time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC),
+		Modified: time.Date(2026, 6, 16, 0, 0, 0, 0, time.UTC),
+		Body:     "content",
+	}
+	_ = s.WriteCard("boundary", card, "test")
+
+	results, err := s.Search(SearchOptions{ModifiedSince: time.Date(2026, 6, 16, 0, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if len(results) != 1 {
+		t.Errorf("Expected boundary card included when modified equals since date, got %d", len(results))
+	}
+}

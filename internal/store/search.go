@@ -3,7 +3,9 @@ package store
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 )
 
 type CardMetadata struct {
@@ -16,7 +18,22 @@ type CardMetadata struct {
 	Modified string
 }
 
-func (s *Store) SearchCards(query string, tags []string, category, status *string, limit, offset int) ([]CardMetadata, error) {
+// SearchOptions describes a card search. All fields are optional; the zero
+// value returns every active card. ModifiedSince filters to cards whose
+// frontmatter `modified` timestamp is on or after the given time.
+type SearchOptions struct {
+	Query         string
+	Tags          []string
+	Category      string
+	Status        string
+	ModifiedSince time.Time
+	Limit         int
+	Offset        int
+}
+
+// Search returns active cards matching the given options, sorted by slug and
+// paginated by Limit/Offset.
+func (s *Store) Search(opts SearchOptions) ([]CardMetadata, error) {
 	entries, err := os.ReadDir(s.cardsDir)
 	if err != nil {
 		return nil, err
@@ -39,7 +56,7 @@ func (s *Store) SearchCards(query string, tags []string, category, status *strin
 			continue
 		}
 
-		if !matchesQuery(card, query, tags, category, status) {
+		if !matchesSearch(card, opts) {
 			continue
 		}
 
@@ -54,23 +71,47 @@ func (s *Store) SearchCards(query string, tags []string, category, status *strin
 		})
 	}
 
-	// Apply pagination
-	if offset > 0 {
-		if offset >= len(results) {
-			return nil, nil
-		}
-		results = results[offset:]
+	// Deterministic ordering so pagination is stable across runs.
+	sort.Slice(results, func(i, j int) bool { return results[i].Slug < results[j].Slug })
+
+	// Apply pagination.
+	offset := opts.Offset
+	if offset < 0 {
+		offset = 0
 	}
-	if limit > 0 && limit < len(results) {
-		results = results[:limit]
+	if offset >= len(results) {
+		return nil, nil
+	}
+	results = results[offset:]
+
+	if opts.Limit > 0 && opts.Limit < len(results) {
+		results = results[:opts.Limit]
 	}
 
 	return results, nil
 }
 
-func matchesQuery(card *Card, query string, tags []string, category, status *string) bool {
-	if query != "" {
-		q := strings.ToLower(query)
+// SearchCards is retained for backward compatibility. New callers should use
+// Search with SearchOptions.
+func (s *Store) SearchCards(query string, tags []string, category, status *string, limit, offset int) ([]CardMetadata, error) {
+	opts := SearchOptions{
+		Query:  query,
+		Tags:   tags,
+		Limit:  limit,
+		Offset: offset,
+	}
+	if category != nil {
+		opts.Category = *category
+	}
+	if status != nil {
+		opts.Status = *status
+	}
+	return s.Search(opts)
+}
+
+func matchesSearch(card *Card, opts SearchOptions) bool {
+	if opts.Query != "" {
+		q := strings.ToLower(opts.Query)
 		found := false
 		if strings.Contains(strings.ToLower(card.Title), q) {
 			found = true
@@ -92,7 +133,7 @@ func matchesQuery(card *Card, query string, tags []string, category, status *str
 		}
 	}
 
-	for _, tag := range tags {
+	for _, tag := range opts.Tags {
 		found := false
 		for _, ctag := range card.Tags {
 			if ctag == tag {
@@ -105,10 +146,13 @@ func matchesQuery(card *Card, query string, tags []string, category, status *str
 		}
 	}
 
-	if category != nil && *category != "" && card.Category != *category {
+	if opts.Category != "" && card.Category != opts.Category {
 		return false
 	}
-	if status != nil && *status != "" && card.Status != *status {
+	if opts.Status != "" && card.Status != opts.Status {
+		return false
+	}
+	if !opts.ModifiedSince.IsZero() && card.Modified.Before(opts.ModifiedSince) {
 		return false
 	}
 
