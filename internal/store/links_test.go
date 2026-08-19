@@ -54,7 +54,7 @@ func TestLinkGraph(t *testing.T) {
 	}
 }
 
-func TestLinkGraphHandlesArchivedLinks(t *testing.T) {
+func TestLinkGraphExcludesArchivedByDefault(t *testing.T) {
 	tmp := t.TempDir()
 	s, _ := Init(tmp)
 
@@ -67,10 +67,40 @@ func TestLinkGraphHandlesArchivedLinks(t *testing.T) {
 
 	graph, _ := s.LinkGraph()
 
+	if _, exists := graph["card-b"]; exists {
+		t.Error("card-b should not appear in the default active-only graph")
+	}
+
+	aStats := graph["card-a"]
+	if aStats.Outbound != 1 {
+		t.Errorf("card-a outbound = %d, want 1", aStats.Outbound)
+	}
+	if aStats.Inbound != 0 {
+		t.Errorf("card-a inbound = %d, want 0", aStats.Inbound)
+	}
+}
+
+func TestLinkGraphIncludingArchived(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	cardA := &Card{Slug: "card-a", Title: "Card A", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "Links to [[card-b]]"}
+	_ = s.WriteCard("card-a", cardA, "test")
+
+	cardB := &Card{Slug: "card-b", Title: "Card B", Created: time.Date(2025, 1, 16, 0, 0, 0, 0, time.UTC), Body: "Content"}
+	_ = s.WriteCard("card-b", cardB, "test")
+	_ = s.ArchiveCard("card-b")
+
+	graph, _ := s.LinkGraphIncludingArchived()
+
 	bStats, exists := graph["card-b"]
 	if !exists {
-		t.Error("card-b not in graph")
-	} else if bStats.Inbound != 1 {
+		t.Fatal("card-b not in graph with archived included")
+	}
+	if !bStats.Archived {
+		t.Error("card-b should be marked archived")
+	}
+	if bStats.Inbound != 1 {
 		t.Errorf("card-b inbound = %d, want 1", bStats.Inbound)
 	}
 }
@@ -144,5 +174,68 @@ func TestLinksForCardArchived(t *testing.T) {
 	}
 	if len(outbound) != 0 {
 		t.Errorf("Outbound = %v, want []", outbound)
+	}
+}
+
+func TestBrokenLinks(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	cards := []*Card{
+		{Slug: "card-a", Title: "Card A", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "Links to [[missing-one]] and [[archived-one]] and [[card-b]]"},
+		{Slug: "card-b", Title: "Card B", Created: time.Date(2025, 1, 16, 0, 0, 0, 0, time.UTC), Body: "Content"},
+	}
+	for _, c := range cards {
+		_ = s.WriteCard(c.Slug, c, "test")
+	}
+
+	// Create and archive a target so we can verify the "archived" kind.
+	archived := &Card{Slug: "archived-one", Title: "Archived One", Created: time.Date(2025, 1, 17, 0, 0, 0, 0, time.UTC), Body: "Content"}
+	_ = s.WriteCard("archived-one", archived, "test")
+	_ = s.ArchiveCard("archived-one")
+
+	broken, err := s.BrokenLinks()
+	if err != nil {
+		t.Fatalf("BrokenLinks failed: %v", err)
+	}
+
+	if len(broken) != 2 {
+		t.Fatalf("Expected 2 broken links, got %d: %v", len(broken), broken)
+	}
+
+	byTarget := map[string]BrokenLink{}
+	for _, b := range broken {
+		byTarget[b.To] = b
+	}
+
+	if b, ok := byTarget["missing-one"]; !ok || b.Kind != "missing" {
+		t.Errorf("missing-one link missing or wrong kind: %+v", b)
+	}
+	if b, ok := byTarget["archived-one"]; !ok || b.Kind != "archived" {
+		t.Errorf("archived-one link missing or wrong kind: %+v", b)
+	}
+	if b := byTarget["archived-one"]; b.From != "card-a" {
+		t.Errorf("archived-one link From = %q, want card-a", b.From)
+	}
+}
+
+func TestBrokenLinksNone(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	cards := []*Card{
+		{Slug: "card-a", Title: "Card A", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "Links to [[card-b]]"},
+		{Slug: "card-b", Title: "Card B", Created: time.Date(2025, 1, 16, 0, 0, 0, 0, time.UTC), Body: "Content"},
+	}
+	for _, c := range cards {
+		_ = s.WriteCard(c.Slug, c, "test")
+	}
+
+	broken, err := s.BrokenLinks()
+	if err != nil {
+		t.Fatalf("BrokenLinks failed: %v", err)
+	}
+	if len(broken) != 0 {
+		t.Errorf("Expected no broken links, got %v", broken)
 	}
 }
