@@ -14,9 +14,9 @@ type LinkStats struct {
 }
 
 type BrokenLink struct {
-	From string // active card slug containing the link
-	To   string // target slug
-	Kind string // "missing" or "archived"
+	From string `json:"from"` // active card slug containing the link
+	To   string `json:"to"`   // target slug
+	Kind string `json:"kind"` // "missing" or "archived"
 }
 
 // LinkGraph returns the active link graph. Only cards in cardsDir are nodes;

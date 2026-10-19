@@ -1,6 +1,8 @@
 package store
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -77,6 +79,62 @@ func TestOrganizeReportSince(t *testing.T) {
 	// Orphans/hubs/conflicts are still computed across all cards regardless of since.
 	if !contains(report.Orphans, "old") {
 		t.Errorf("orphans should still include 'old' regardless of since: %v", report.Orphans)
+	}
+}
+
+func TestOrganizeReportJSON(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	// A card with no links and a card with a broken link.
+	plain := &Card{Slug: "plain", Title: "Plain", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "no links"}
+	_ = s.WriteCard("plain", plain, "test")
+
+	linker := &Card{Slug: "linker", Title: "Linker", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "Links to [[missing]]"}
+	_ = s.WriteCard("linker", linker, "test")
+
+	report, err := s.OrganizeReport(time.Time{})
+	if err != nil {
+		t.Fatalf("OrganizeReport failed: %v", err)
+	}
+
+	data, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	var doc map[string]json.RawMessage
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	// Empty slices must marshal as [], never null — downstream tooling
+	// should not have to handle both.
+	for _, field := range []string{"orphans", "hubs", "conflicts", "recently_modified", "broken_links"} {
+		raw, ok := doc[field]
+		if !ok {
+			t.Fatalf("missing field %q in JSON: %s", field, data)
+		}
+		if strings.TrimSpace(string(raw)) == "null" {
+			t.Errorf("field %q marshals as null, want []", field)
+		}
+	}
+
+	// Broken link keys must be snake-consistent lowercase, not Go field names.
+	var broken []map[string]any
+	if err := json.Unmarshal(doc["broken_links"], &broken); err != nil {
+		t.Fatalf("Unmarshal broken_links failed: %v", err)
+	}
+	if len(broken) != 1 {
+		t.Fatalf("broken_links = %v, want 1 entry", broken)
+	}
+	for _, key := range []string{"from", "to", "kind"} {
+		if _, ok := broken[0][key]; !ok {
+			t.Errorf("broken_links entry missing key %q: %v", key, broken[0])
+		}
+	}
+	if _, ok := broken[0]["From"]; ok {
+		t.Errorf("broken_links entry has PascalCase key %q: %v", "From", broken[0])
 	}
 }
 

@@ -42,7 +42,11 @@ since the last organize run.`,
 		}
 
 		if organizeJSON {
-			data, _ := json.MarshalIndent(report, "", "  ")
+			data, err := json.MarshalIndent(report, "", "  ")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: failed to marshal report: %v\n", err)
+				os.Exit(1)
+			}
 			fmt.Println(string(data))
 			return
 		}

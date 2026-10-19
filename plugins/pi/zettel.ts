@@ -24,36 +24,40 @@
  *   resources_discover  – exposes bundled skills (zettel-recall, zettel-retro, etc.)
  */
 
-import type { ExtensionAPI } from '@mariozechner/pi-coding-agent';
-import { Type } from '@sinclair/typebox';
-import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { Type } from "@sinclair/typebox";
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
-const skillsDir = join(baseDir, 'skills');
+const skillsDir = join(baseDir, "skills");
 
 /** Run a zettel CLI command and return stdout. Uses spawn to support stdin. */
-function zettel(args: string[], stdin?: string): Promise<{ stdout: string; stderr: string; ok: boolean }> {
+function zettel(
+  args: string[],
+  stdin?: string,
+): Promise<{ stdout: string; stderr: string; ok: boolean }> {
   return new Promise((resolve) => {
-    const child = spawn('zettel', [...args, '--quiet'], { timeout: 30_000 });
+    const child = spawn("zettel", [...args, "--quiet"], { timeout: 30_000 });
 
-    let stdout = '';
-    let stderr = '';
+    let stdout = "";
+    let stderr = "";
 
-    child.stdout.on('data', (data: Buffer) => {
+    child.stdout.on("data", (data: Buffer) => {
       stdout += data.toString();
     });
-    child.stderr.on('data', (data: Buffer) => {
+    child.stderr.on("data", (data: Buffer) => {
       stderr += data.toString();
     });
 
-    child.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'ENOENT') {
+    child.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") {
         resolve({
-          stdout: '',
-          stderr: 'zettel CLI not found. Install it with: npm install -g @touchskyer/zettel',
+          stdout: "",
+          stderr:
+            "zettel CLI not found. Install it with: npm install -g @touchskyer/zettel",
           ok: false,
         });
       } else {
@@ -61,7 +65,7 @@ function zettel(args: string[], stdin?: string): Promise<{ stdout: string; stder
       }
     });
 
-    child.on('close', (code: number | null) => {
+    child.on("close", (code: number | null) => {
       resolve({ stdout: stdout.trim(), stderr: stderr.trim(), ok: code === 0 });
     });
 
@@ -74,7 +78,7 @@ function zettel(args: string[], stdin?: string): Promise<{ stdout: string; stder
 
 function textResult(text: string, isError = false) {
   return {
-    content: [{ type: 'text' as const, text }],
+    content: [{ type: "text" as const, text }],
     details: {},
     ...(isError ? { isError: true } : {}),
   };
@@ -103,7 +107,7 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // Resource discovery — expose bundled skills to Pi
   // -----------------------------------------------------------------------
 
-  pi.on('resources_discover', async () => {
+  pi.on("resources_discover", async () => {
     if (!existsSync(skillsDir)) return;
     return {
       skillPaths: [skillsDir],
@@ -114,7 +118,7 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // Session lifecycle
   // -----------------------------------------------------------------------
 
-  pi.on('session_start', async (_event, _ctx) => {
+  pi.on("session_start", async (_event, _ctx) => {
     recallDone = false;
     retroDone = false;
   });
@@ -122,30 +126,30 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // After compaction the recall reminder message is summarized away.
   // Reset recallDone so before_agent_start re-injects the reminder on
   // the next user prompt.
-  pi.on('session_compact', async (_event, _ctx) => {
+  pi.on("session_compact", async (_event, _ctx) => {
     recallDone = false;
   });
 
   // Inject recall reminder at the start of each agent turn (until recall is done)
-  pi.on('before_agent_start', async (_event, _ctx) => {
+  pi.on("before_agent_start", async (_event, _ctx) => {
     if (recallDone) return;
 
     return {
       message: {
-        customType: 'zettel-recall-reminder',
+        customType: "zettel-recall-reminder",
         content: [
-          '## zettel Memory System Active',
-          '',
-          'You have a Zettelkasten memory system available via the `zettel_recall` tool.',
-          '**BEFORE starting work**, call `zettel_recall` (with no query) to load your keyword index.',
-          'Then read relevant cards with `zettel_read` and search with `zettel_search`.',
-          'Never include actual secrets, credentials, tokens, or exact secret file contents in zettel query/body arguments; use abstract descriptions or redacted examples.',
-          '',
-          '**AFTER completing the task**, if you learned something non-obvious,',
-          'call `zettel_retro` to save atomic insight cards for future sessions.',
-          '',
-          'Memory recall guardrails: max 3 link hops, max 20 cards read.',
-        ].join('\n'),
+          "## zettel Memory System Active",
+          "",
+          "You have a Zettelkasten memory system available via the `zettel_recall` tool.",
+          "**BEFORE starting work**, call `zettel_recall` (with no query) to load your keyword index.",
+          "Then read relevant cards with `zettel_read` and search with `zettel_search`.",
+          "Never include actual secrets, credentials, tokens, or exact secret file contents in zettel query/body arguments; use abstract descriptions or redacted examples.",
+          "",
+          "**AFTER completing the task**, if you learned something non-obvious,",
+          "call `zettel_retro` to save atomic insight cards for future sessions.",
+          "",
+          "Memory recall guardrails: max 3 link hops, max 20 cards read.",
+        ].join("\n"),
         display: false,
       },
     };
@@ -154,20 +158,20 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // After each agent response, remind the LLM to call zettel_retro if it
   // hasn't done so yet. Uses "nextTurn" delivery so it doesn't interrupt
   // the current response — the reminder appears on the next user prompt.
-  pi.on('agent_end', async (_event, _ctx) => {
+  pi.on("agent_end", async (_event, _ctx) => {
     if (retroDone || !recallDone) return;
 
     pi.sendMessage(
       {
-        customType: 'zettel-retro-reminder',
+        customType: "zettel-retro-reminder",
         content: [
-          '**zettel reminder:** If you learned something non-obvious in this task,',
-          'call `zettel_retro` to save an atomic insight card before finishing.',
-        ].join(' '),
+          "**zettel reminder:** If you learned something non-obvious in this task,",
+          "call `zettel_retro` to save an atomic insight card before finishing.",
+        ].join(" "),
         display: false,
       },
       {
-        deliverAs: 'nextTurn',
+        deliverAs: "nextTurn",
       },
     );
   });
@@ -177,10 +181,10 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   pi.registerTool({
-    name: 'zettel_recall',
-    label: 'zettel Recall',
+    name: "zettel_recall",
+    label: "zettel Recall",
     description:
-      'IMPORTANT: Call at the START of every task. Retrieves your persistent Zettelkasten memory — knowledge cards from previous sessions. Returns the keyword index (if exists) or card list. USAGE: Call with NO query first to get the index. Only use query when you need to find specific cards — pass 1-3 short keywords, NOT sentences or task summaries. Keyword search uses AND logic (every token must appear in the same card). For natural-language search, use zettel_search with semantic=true instead. Never include actual secrets, credentials, tokens, or exact secret file contents in query.',
+      "IMPORTANT: Call at the START of every task. Retrieves your persistent Zettelkasten memory — knowledge cards from previous sessions. Returns the keyword index (if exists) or card list. USAGE: Call with NO query first to get the index. Only use query when you need to find specific cards — pass 1-3 short keywords, NOT sentences or task summaries. Keyword search uses AND logic (every token must appear in the same card). For natural-language search, use zettel_search with semantic=true instead. Never include actual secrets, credentials, tokens, or exact secret file contents in query.",
     parameters: Type.Object({
       query: Type.Optional(
         Type.String({
@@ -194,20 +198,24 @@ export default function zettelExtension(pi: ExtensionAPI) {
       const { query } = params as { query?: string };
 
       if (query) {
-        const res = await zettel(['search', query, '--limit', '10']);
+        const res = await zettel(["search", query, "--limit", "10"]);
         if (!res.ok) return textResult(res.stderr, true);
-        return textResult(appendStderrWarning(res.stdout || 'No cards found.', res.stderr));
+        return textResult(
+          appendStderrWarning(res.stdout || "No cards found.", res.stderr),
+        );
       }
 
       // Try index first, then fall back to listing all cards
-      const indexRes = await zettel(['read', 'index']);
+      const indexRes = await zettel(["read", "index"]);
       if (indexRes.ok && indexRes.stdout) {
         return textResult(indexRes.stdout);
       }
 
-      const listRes = await zettel(['search', '--limit', '10']);
+      const listRes = await zettel(["search", "--limit", "10"]);
       if (!listRes.ok) return textResult(listRes.stderr, true);
-      return textResult(listRes.stdout || 'No cards yet. This is a fresh memory.');
+      return textResult(
+        listRes.stdout || "No cards yet. This is a fresh memory.",
+      );
     },
   });
 
@@ -216,29 +224,30 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   pi.registerTool({
-    name: 'zettel_retro',
-    label: 'zettel Retro',
+    name: "zettel_retro",
+    label: "zettel Retro",
     description:
-      'IMPORTANT: Call at the END of every task to save what you learned. Write one atomic insight per card with [[wikilinks]] to related cards. Only save non-obvious learnings. Never save actual secrets, credentials, tokens, or exact secret file contents. Handles frontmatter automatically.',
+      "IMPORTANT: Call at the END of every task to save what you learned. Write one atomic insight per card with [[wikilinks]] to related cards. Only save non-obvious learnings. Never save actual secrets, credentials, tokens, or exact secret file contents. Handles frontmatter automatically.",
     parameters: Type.Object({
       slug: Type.String({
         description: "Card slug in kebab-case (e.g. 'jwt-revocation-pattern')",
       }),
       title: Type.String({
-        description: 'Card title (≤60 chars, noun phrase not sentence)',
+        description: "Card title (≤60 chars, noun phrase not sentence)",
       }),
       body: Type.String({
-        description: 'Card body in markdown with [[wikilinks]] explaining relationships',
+        description:
+          "Card body in markdown with [[wikilinks]] explaining relationships",
       }),
       category: Type.Optional(
         Type.String({
-          description: 'Category (e.g. frontend, architecture, devops)',
+          description: "Category (e.g. frontend, architecture, devops)",
         }),
       ),
       tags: Type.Optional(
         Type.Array(
           Type.String({
-            description: 'Tags (e.g. gotcha, decision, docker)',
+            description: "Tags (e.g. gotcha, decision, docker)",
           }),
         ),
       ),
@@ -251,23 +260,25 @@ export default function zettelExtension(pi: ExtensionAPI) {
         category?: string;
       };
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toISOString().split("T")[0];
       const frontmatter: Record<string, string> = {
         title,
         created: today,
-        source: 'pi',
+        source: "pi",
       };
       if (category) frontmatter.category = category;
 
       const yaml = Object.entries(frontmatter)
         .map(([k, v]) => `${k}: ${v}`)
-        .join('\n');
+        .join("\n");
       const content = `---\n${yaml}\n---\n\n${body}`;
 
-      const res = await zettel(['write', slug], content);
+      const res = await zettel(["write", slug], content);
       if (!res.ok) return textResult(res.stderr, true);
       retroDone = true;
-      return textResult(appendStderrWarning(`Card '${slug}' saved successfully.`, res.stderr));
+      return textResult(
+        appendStderrWarning(`Card '${slug}' saved successfully.`, res.stderr),
+      );
     },
   });
 
@@ -276,19 +287,38 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   pi.registerTool({
-    name: 'zettel_search',
-    label: 'zettel Search',
+    name: "zettel_search",
+    label: "zettel Search",
     description:
-      'Full-text search memory cards. Omit query to list all cards. Never include actual secrets, credentials, tokens, or exact secret file contents in query.',
+      "Full-text search memory cards. Omit query to list all cards. Never include actual secrets, credentials, tokens, or exact secret file contents in query.",
     parameters: Type.Object({
-      query: Type.Optional(Type.String({ description: 'Search keyword (substring match on title/body/tags/category)' })),
-      status: Type.Optional(Type.String({ description: "Filter by frontmatter status (e.g. 'conflict')" })),
-      category: Type.Optional(Type.String({ description: 'Filter by frontmatter category' })),
-      modified_since: Type.Optional(
-        Type.String({ description: 'Only cards modified on or after this date (YYYY-MM-DD)' }),
+      query: Type.Optional(
+        Type.String({
+          description:
+            "Search keyword (substring match on title/body/tags/category)",
+        }),
       ),
-      limit: Type.Optional(Type.Number({ description: 'Max results (default 10, 0 = unlimited)' })),
-      offset: Type.Optional(Type.Number({ description: 'Skip N results for pagination (default 0)' })),
+      status: Type.Optional(
+        Type.String({
+          description: "Filter by frontmatter status (e.g. 'conflict')",
+        }),
+      ),
+      category: Type.Optional(
+        Type.String({ description: "Filter by frontmatter category" }),
+      ),
+      modified_since: Type.Optional(
+        Type.String({
+          description: "Only cards modified on or after this date (YYYY-MM-DD)",
+        }),
+      ),
+      limit: Type.Optional(
+        Type.Number({ description: "Max results (default 10, 0 = unlimited)" }),
+      ),
+      offset: Type.Optional(
+        Type.Number({
+          description: "Skip N results for pagination (default 0)",
+        }),
+      ),
     }),
     async execute(_toolCallId, params) {
       const p = params as {
@@ -299,18 +329,20 @@ export default function zettelExtension(pi: ExtensionAPI) {
         limit?: number;
         offset?: number;
       };
-      const args = ['search'];
+      const args = ["search"];
       if (p.query) args.push(p.query);
-      if (p.status) args.push('--status', p.status);
-      if (p.category) args.push('--category', p.category);
-      if (p.modified_since) args.push('--modified-since', p.modified_since);
+      if (p.status) args.push("--status", p.status);
+      if (p.category) args.push("--category", p.category);
+      if (p.modified_since) args.push("--modified-since", p.modified_since);
       // Always pass offset and limit explicitly so pagination is deterministic.
-      args.push('--offset', String(toInt(p.offset, 0)));
-      args.push('--limit', String(toInt(p.limit, 10)));
+      args.push("--offset", String(toInt(p.offset, 0)));
+      args.push("--limit", String(toInt(p.limit, 10)));
 
       const res = await zettel(args);
       if (!res.ok) return textResult(res.stderr, true);
-      return textResult(appendStderrWarning(res.stdout || 'No cards found.', res.stderr));
+      return textResult(
+        appendStderrWarning(res.stdout || "No cards found.", res.stderr),
+      );
     },
   });
 
@@ -319,15 +351,15 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   pi.registerTool({
-    name: 'zettel_read',
-    label: 'zettel Read',
-    description: 'Read a specific memory card by its slug.',
+    name: "zettel_read",
+    label: "zettel Read",
+    description: "Read a specific memory card by its slug.",
     parameters: Type.Object({
       slug: Type.String({ description: "Card slug (e.g. 'my-card-name')" }),
     }),
     async execute(_toolCallId, params) {
       const { slug } = params as { slug: string };
-      const res = await zettel(['read', slug]);
+      const res = await zettel(["read", slug]);
       if (!res.ok) return textResult(res.stderr, true);
       return textResult(res.stdout);
     },
@@ -338,23 +370,26 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   pi.registerTool({
-    name: 'zettel_write',
-    label: 'zettel Write',
+    name: "zettel_write",
+    label: "zettel Write",
     description:
-      'Write or update a memory card. Content should include YAML frontmatter + markdown body. Never write actual secrets, credentials, tokens, or exact secret file contents.',
+      "Write or update a memory card. Content should include YAML frontmatter + markdown body. Never write actual secrets, credentials, tokens, or exact secret file contents.",
     parameters: Type.Object({
       slug: Type.String({
-        description: 'Card slug in kebab-case',
+        description: "Card slug in kebab-case",
       }),
       content: Type.String({
-        description: 'Full card content: YAML frontmatter (---) + markdown body with [[wikilinks]]',
+        description:
+          "Full card content: YAML frontmatter (---) + markdown body with [[wikilinks]]",
       }),
     }),
     async execute(_toolCallId, params) {
       const { slug, content } = params as { slug: string; content: string };
-      const res = await zettel(['write', slug], content);
+      const res = await zettel(["write", slug], content);
       if (!res.ok) return textResult(res.stderr, true);
-      return textResult(appendStderrWarning(`Card '${slug}' written successfully.`, res.stderr));
+      return textResult(
+        appendStderrWarning(`Card '${slug}' written successfully.`, res.stderr),
+      );
     },
   });
 
@@ -363,24 +398,25 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   pi.registerTool({
-    name: 'zettel_links',
-    label: 'zettel Links',
+    name: "zettel_links",
+    label: "zettel Links",
     description:
       "Show link graph stats. Omit slug for global stats, or specify a slug for that card's links. Set broken=true to list wikilinks pointing to missing/archived cards.",
     parameters: Type.Object({
       slug: Type.Optional(
         Type.String({
-          description: 'Card slug (omit for global stats)',
+          description: "Card slug (omit for global stats)",
         }),
       ),
       broken: Type.Optional(
         Type.Boolean({
-          description: 'List [[wikilinks]] pointing to missing or archived cards',
+          description:
+            "List [[wikilinks]] pointing to missing or archived cards",
         }),
       ),
       include_archived: Type.Optional(
         Type.Boolean({
-          description: 'Include archived cards in the global graph',
+          description: "Include archived cards in the global graph",
         }),
       ),
     }),
@@ -390,17 +426,17 @@ export default function zettelExtension(pi: ExtensionAPI) {
         broken?: boolean;
         include_archived?: boolean;
       };
-      const args = ['links'];
+      const args = ["links"];
       if (broken) {
-        args.push('--broken');
+        args.push("--broken");
       } else if (include_archived) {
-        args.push('--include-archived');
+        args.push("--include-archived");
       }
       if (slug && !broken) args.push(slug);
 
       const res = await zettel(args);
       if (!res.ok) return textResult(res.stderr, true);
-      return textResult(res.stdout || 'No link data.');
+      return textResult(res.stdout || "No link data.");
     },
   });
 
@@ -409,21 +445,22 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   pi.registerTool({
-    name: 'zettel_organize',
-    label: 'zettel Organize',
+    name: "zettel_organize",
+    label: "zettel Organize",
     description:
-      'Emit an organize report: orphans, hubs, unresolved conflicts, recently modified cards (with their linked neighbors), and broken links. Optional since date (YYYY-MM-DD) limits the recently-modified section.',
+      "Emit an organize report: orphans, hubs, unresolved conflicts, recently modified cards (with their linked neighbors), and broken links. Optional since date (YYYY-MM-DD) limits the recently-modified section.",
     parameters: Type.Object({
       since: Type.Optional(
         Type.String({
-          description: 'Only include recently modified cards since this date (YYYY-MM-DD)',
+          description:
+            "Only include recently modified cards since this date (YYYY-MM-DD)",
         }),
       ),
     }),
     async execute(_toolCallId, params) {
       const { since } = params as { since?: string };
-      const args = ['organize'];
-      if (since) args.push('--since', since);
+      const args = ["organize"];
+      if (since) args.push("--since", since);
 
       const res = await zettel(args);
       if (!res.ok) return textResult(res.stderr, true);
@@ -436,19 +473,22 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   pi.registerTool({
-    name: 'zettel_archive',
-    label: 'zettel Archive',
-    description: 'Archive a card (move to archive). Use for outdated or superseded cards. Idempotent.',
+    name: "zettel_archive",
+    label: "zettel Archive",
+    description:
+      "Archive a card (move to archive). Use for outdated or superseded cards. Idempotent.",
     parameters: Type.Object({
-      slug: Type.String({ description: 'Card slug to archive' }),
+      slug: Type.String({ description: "Card slug to archive" }),
       dry_run: Type.Optional(
-        Type.Boolean({ description: 'Show what would be archived without changing anything' }),
+        Type.Boolean({
+          description: "Show what would be archived without changing anything",
+        }),
       ),
     }),
     async execute(_toolCallId, params) {
       const { slug, dry_run } = params as { slug: string; dry_run?: boolean };
-      const args = ['archive', slug];
-      if (dry_run) args.push('--dry-run');
+      const args = ["archive", slug];
+      if (dry_run) args.push("--dry-run");
       const res = await zettel(args);
       if (!res.ok) return textResult(res.stderr, true);
       return textResult(res.stdout || `Card '${slug}' archived.`);
@@ -460,14 +500,16 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // -----------------------------------------------------------------------
 
   pi.registerTool({
-    name: 'zettel_store_path',
-    label: 'zettel store-path',
-    description: 'Fetch the filesystem path where the zettel cards live',
+    name: "zettel_store_path",
+    label: "zettel store-path",
+    description: "Fetch the filesystem path where the zettel cards live",
     parameters: {},
     async execute() {
-      const res = await zettel(['store-path']);
+      const res = await zettel(["store-path"]);
       if (!res.ok) return textResult(res.stderr, true);
-      return textResult(appendStderrWarning(`Zettel store-path: ${res.stdout}`, res.stderr));
+      return textResult(
+        appendStderrWarning(`Zettel store-path: ${res.stdout}`, res.stderr),
+      );
     },
   });
 }

@@ -94,7 +94,7 @@ func (s *Store) OrganizeReport(since time.Time) (*OrganizeReport, error) {
 		return report.RecentlyModified[i].Slug < report.RecentlyModified[j].Slug
 	})
 
-	if broken, err := s.BrokenLinks(); err == nil {
+	if broken, err := s.BrokenLinks(); err == nil && broken != nil {
 		report.BrokenLinks = broken
 	}
 
@@ -104,10 +104,10 @@ func (s *Store) OrganizeReport(since time.Time) (*OrganizeReport, error) {
 func (s *Store) linkedNeighbors(slug string) []string {
 	inbound, outbound, err := s.LinksForCard(slug)
 	if err != nil {
-		return nil
+		return []string{}
 	}
 	seen := map[string]bool{}
-	var neighbors []string
+	neighbors := []string{}
 	for _, n := range append(inbound, outbound...) {
 		if !seen[n] {
 			seen[n] = true

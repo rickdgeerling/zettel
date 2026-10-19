@@ -49,6 +49,12 @@ echo "$links_output" | grep -q "ORPHAN" || { echo "test-card should be marked OR
 broken_output=$($ZETTEL links --broken)
 echo "$broken_output" | grep -q "test-card -> \[\[link\]\] (missing)" || { echo "Broken links failed: $broken_output"; exit 1; }
 
+# Organize report as JSON (must be valid JSON on stdout, store-path banner is stderr-only)
+organize_json=$($ZETTEL organize --json 2>/dev/null)
+echo "$organize_json" | jq -e '.total == 2' > /dev/null || { echo "organize --json: total field wrong: $organize_json"; exit 1; }
+echo "$organize_json" | jq -e '.broken_links[0].to == "link" and .broken_links[0].kind == "missing"' > /dev/null || { echo "organize --json: broken_links shape wrong: $organize_json"; exit 1; }
+echo "$organize_json" | jq -e '.broken_links != null and .orphans != null and .hubs != null' > /dev/null || { echo "organize --json: fields must never be null: $organize_json"; exit 1; }
+
 # Archive
 $ZETTEL archive test-card
 test -f "$PROJECT_DIR/.zettel/archived/test-card.md" || { echo "Archive failed: not in archived dir"; exit 1; }
