@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -42,11 +43,29 @@ func (s *Store) WriteCard(slug string, card *Card, source string) error {
 	if card.Title == "" {
 		return fmt.Errorf("title is required")
 	}
-	if card.Created.IsZero() {
-		card.Created = time.Now().Truncate(time.Second)
-	}
-	if card.Modified.IsZero() {
+
+	// Immutable metadata comes from the card already on disk (active or
+	// archived): created is preserved so callers carrying stale copies
+	// cannot reset it, and modified is always bumped so --modified-since
+	// windows observe every rewrite.
+	existing, err := s.ReadCard(slug)
+	switch {
+	case err == nil:
+		if !existing.Created.IsZero() {
+			card.Created = existing.Created
+		}
 		card.Modified = time.Now().Truncate(time.Second)
+	case errors.Is(err, ErrCardNotFound):
+		// New card: trust caller-provided timestamps (imports may carry
+		// historical ones), defaulting to now.
+		if card.Created.IsZero() {
+			card.Created = time.Now().Truncate(time.Second)
+		}
+		if card.Modified.IsZero() {
+			card.Modified = time.Now().Truncate(time.Second)
+		}
+	default:
+		return fmt.Errorf("reading existing card %s: %w", slug, err)
 	}
 
 	if card.Source == "" {

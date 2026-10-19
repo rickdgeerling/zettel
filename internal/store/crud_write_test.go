@@ -130,6 +130,71 @@ func TestWriteCardMissingCreated(t *testing.T) {
 	}
 }
 
+func TestWriteCardOverwriteBumpsModified(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	original := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
+	card := &Card{
+		Slug:     "bump-modified",
+		Title:    "Test",
+		Created:  time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC),
+		Modified: original,
+		Body:     "v1",
+	}
+	_ = s.WriteCard("bump-modified", card, "cli")
+
+	// Caller preserves a stale stamp (as read output does); the store must
+	// bump modified anyway or the card would never show up in a
+	// --modified-since window.
+	stale := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	update := &Card{
+		Slug:     "bump-modified",
+		Title:    "Test",
+		Created:  time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC),
+		Modified: stale,
+		Body:     "v2",
+	}
+	if err := s.WriteCard("bump-modified", update, "cli"); err != nil {
+		t.Fatalf("WriteCard overwrite failed: %v", err)
+	}
+
+	parsed, _ := s.ReadCard("bump-modified")
+	if !parsed.Modified.After(original) {
+		t.Errorf("Modified not bumped on overwrite: got %v, want later than %v", parsed.Modified, original)
+	}
+}
+
+func TestWriteCardOverwritePreservesCreated(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	first := time.Date(2024, 1, 10, 0, 0, 0, 0, time.UTC)
+	card := &Card{
+		Slug:    "keep-created",
+		Title:   "Test",
+		Created: first,
+		Body:    "v1",
+	}
+	_ = s.WriteCard("keep-created", card, "cli")
+
+	// A caller submitting a different created must not reset provenance.
+	update := &Card{
+		Slug:    "keep-created",
+		Title:   "Test",
+		Created: time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC),
+		Body:    "v2",
+	}
+	if err := s.WriteCard("keep-created", update, "cli"); err != nil {
+		t.Fatalf("WriteCard overwrite failed: %v", err)
+	}
+
+	parsed, _ := s.ReadCard("keep-created")
+	if !parsed.Created.Equal(first) {
+		t.Errorf("Created not preserved on overwrite: got %v, want %v", parsed.Created, first)
+	}
+}
+
 func TestWriteCardPreservesCallerProvidedModified(t *testing.T) {
 	tmp := t.TempDir()
 	s, _ := Init(tmp)
@@ -148,5 +213,55 @@ func TestWriteCardPreservesCallerProvidedModified(t *testing.T) {
 
 	if !parsed.Modified.Equal(callerProvided) {
 		t.Errorf("Modified was overwritten: got %v, want %v", parsed.Modified, callerProvided)
+	}
+}
+
+// TestReadWriteRoundTrip mirrors the shell pattern `zettel read s | zettel
+// write s`: the read output must be a valid write input that preserves all
+// card content while bumping modified.
+func TestReadWriteRoundTrip(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	card := &Card{
+		Slug:    "round-trip",
+		Title:   "Round Trip",
+		Created: time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC),
+		Source:  "cli",
+		Tags:    []string{"testing", "roundtrip"},
+		Body:    "Body prose with a [[wikilink]].\n\n## Links\n\n- [[other]]: related\n",
+	}
+	if err := s.WriteCard("round-trip", card, "cli"); err != nil {
+		t.Fatalf("WriteCard failed: %v", err)
+	}
+
+	before, err := s.ReadCard("round-trip")
+	if err != nil {
+		t.Fatalf("ReadCard failed: %v", err)
+	}
+
+	reparsed, err := UnmarshalCard("round-trip", []byte(before.Marshal()))
+	if err != nil {
+		t.Fatalf("Read output is not a valid write input: %v", err)
+	}
+	if err := s.WriteCard("round-trip", reparsed, "cli"); err != nil {
+		t.Fatalf("WriteCard round-trip failed: %v", err)
+	}
+
+	after, _ := s.ReadCard("round-trip")
+	if after.Title != before.Title {
+		t.Errorf("Title changed: got %q, want %q", after.Title, before.Title)
+	}
+	if !after.Created.Equal(before.Created) {
+		t.Errorf("Created changed: got %v, want %v", after.Created, before.Created)
+	}
+	if after.Source != before.Source {
+		t.Errorf("Source changed: got %q, want %q", after.Source, before.Source)
+	}
+	if after.Body != before.Body {
+		t.Errorf("Body changed: got %q, want %q", after.Body, before.Body)
+	}
+	if after.Modified.Before(before.Modified) {
+		t.Errorf("Modified went backwards: got %v, want >= %v", after.Modified, before.Modified)
 	}
 }
