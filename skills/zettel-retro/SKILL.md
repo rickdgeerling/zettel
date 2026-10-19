@@ -17,6 +17,7 @@ Two equivalent interfaces exist — use whichever your environment supports:
 | `zettel search <query>`               | `zettel_search` with query arg              |
 | `zettel read <slug>`                  | `zettel_read` with slug arg                 |
 | `zettel write <slug>`                 | `zettel_write` with slug arg and body       |
+| `zettel append <slug> --text <line>`  | `zettel_append` with slug/text/section args |
 
 The rest of this skill uses CLI syntax for brevity. Substitute MCP tool calls if CLI is unavailable.
 
@@ -59,7 +60,7 @@ digraph retro {
 5. Before writing, `zettel search` for related existing cards
 6. **Dedup check**: If an existing card already covers this insight, `zettel read` it, then update it by appending new information (use `zettel write` with the full updated content)
 7. If it's genuinely new, write a new card with `[[links]]` to related cards in the prose
-8. **Add to index**: Read the `index` card (`zettel read index`), then write it back with the new card added under the most appropriate category. If no existing category fits, create one. Use `- [[new-slug]] — one-line description` format, consistent with the existing index entries.
+8. **Add to index**: Update the `index` card with the new card under the most appropriate category: `zettel append index --section "<Category>" --text "- [[new-slug]] — one-line description"` (creates the category section if none fits). Use a description consistent with the existing index entries.
 
 ## Card Format
 

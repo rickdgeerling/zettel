@@ -35,6 +35,14 @@ output=$($ZETTEL read test-card)
 echo "$output" | grep -q "Test Card" || { echo "Read failed: title not found"; exit 1; }
 echo "$output" | grep -q "This is the body" || { echo "Body mismatch"; exit 1; }
 
+# Append to a section (prose-safe edit)
+$ZETTEL append test-card --section "Links" --text "- [[other]]: related" > /dev/null 2>&1 || { echo "Append failed"; exit 1; }
+output=$($ZETTEL read test-card)
+echo "$output" | grep -q '\[\[other\]\]: related' || { echo "Append: new entry missing"; exit 1; }
+echo "$output" | grep -q 'This is the body' || { echo "Append: clobbered prose"; exit 1; }
+format=$(echo "$output" | grep -c '^---$')
+test "$format" -eq 2 || { echo "Append: expected standard frontmatter delimiters, got $format"; exit 1; }
+
 # Search for it
 results=$($ZETTEL search "Test")
 echo "$results" | grep -q "test-card" || { echo "Search failed"; exit 1; }

@@ -23,6 +23,7 @@ Two equivalent interfaces exist — use whichever your environment supports:
 | `zettel search --modified-since <d>`  | `zettel_search` with modified_since arg     |
 | `zettel read <slug>`                  | `zettel_read` with slug arg                 |
 | `zettel write <slug>`                 | `zettel_write` with slug arg and body       |
+| `zettel append <slug> --text <line>`  | `zettel_append` with slug/text/section args |
 | `zettel archive <slug>`               | `zettel_archive` with slug arg              |
 | `zettel store_path`                   | `zettel_store_path`                         |
 
@@ -53,7 +54,7 @@ digraph organize {
 2. **Orphan detection**: For cards with 0 inbound links (the "Orphans" section — navigation cards like `index` and `*-index` are excluded by design):
    - `zettel read` the orphan
    - `zettel search` for potentially related cards
-   - Decide: append a link from a related card to this orphan, or leave alone if truly standalone
+   - Decide: append a link from a related card to this orphan (`zettel append <related-slug> --text '- [[orphan-slug]]: relationship'`), or leave alone if truly standalone
 3. **Hub detection**: For cards with >= 10 inbound links (the "Hubs" section):
    - `zettel read` the hub and its linkers
    - Decide: is this card too broad? Should it be split into smaller atomic concepts?
@@ -129,7 +130,7 @@ When the organize skill creates new cards (e.g., splitting hubs), use `source: o
 
 ## Operation Rules
 
-- **Append only**: When adding links to existing cards, append to the end of the body in a `## Links` section. Add a list item like `- [[link-to-note]]: short explanation of relationship`. Never modify existing prose.
+- **Append only**: When adding links to existing cards, use `zettel append <slug> --section Links --text '- [[link-to-note]]: short explanation of relationship'` (or `zettel_append`). It inserts the line at the end of the `## Links` section — creating the section if absent — without rewriting any existing prose. Never modify existing prose with full-card rewrites when an append will do.
   - **Exception — post-archive cleanup**: After archiving cards, it is OK to remove or re-point `[[links]]` in active cards that now point only at archived/deleted cards. This keeps the network from accumulating dead references. Limit edits to `## Links` sections and stale `[[...]]` references; do not rewrite prose.
 - **Merge**: Read both cards, append source content to target card via `zettel write`, then `zettel archive` the source.
 - **Archive**: Use `zettel archive <slug>` to move stale cards out of active search. Use `zettel archive --dry-run <slug>` to preview. Archiving is idempotent — re-archiving an already-archived card is a safe no-op.

@@ -27,6 +27,7 @@ func NewZettelServer(store *store.Store) *ZettelServer {
 		z.makeSearchTool(),
 		z.makeReadTool(),
 		z.makeWriteTool(),
+		z.makeAppendTool(),
 		z.makeLinksTool(),
 		z.makeArchiveTool(),
 		z.makeOrganizeTool(),
@@ -47,6 +48,8 @@ func (z *ZettelServer) handleTool(ctx context.Context, request mcp.CallToolReque
 		return z.handleRead(request.Params.Arguments)
 	case "zettel_write":
 		return z.handleWrite(request.Params.Arguments)
+	case "zettel_append":
+		return z.handleAppend(request.Params.Arguments)
 	case "zettel_links":
 		return z.handleLinks(request.Params.Arguments)
 	case "zettel_archive":
@@ -99,6 +102,49 @@ func (z *ZettelServer) makeWriteTool() server.ServerTool {
 		Tool:    tool,
 		Handler: z.handleTool,
 	}
+}
+
+func (z *ZettelServer) makeAppendTool() server.ServerTool {
+	tool := mcp.NewTool("zettel_append",
+		mcp.WithDescription("Append a line to a card's section without touching existing prose (creates the section if absent). The safe primitive for append-only edits such as adding - [[slug]]: relationship entries to ## Links. modified is bumped."),
+		mcp.WithString("slug", mcp.Title("Slug"), mcp.Description("Card slug"), mcp.Required()),
+		mcp.WithString("text", mcp.Title("Text"), mcp.Description("Line to append, e.g. '- [[other-slug]]: why related'"), mcp.Required()),
+		mcp.WithString("section", mcp.Title("Section"), mcp.Description("Section heading to append to (default: Links; created if absent)")),
+	)
+	return server.ServerTool{
+		Tool:    tool,
+		Handler: z.handleTool,
+	}
+}
+
+func (z *ZettelServer) handleAppend(args any) (*mcp.CallToolResult, error) {
+	argsMap, ok := args.(map[string]any)
+	if !ok {
+		return errorResult("invalid arguments"), nil
+	}
+
+	slug, ok := argsMap["slug"].(string)
+	if !ok || slug == "" {
+		return errorResult("slug is required"), nil
+	}
+
+	text, ok := argsMap["text"].(string)
+	if !ok || text == "" {
+		return errorResult("text is required"), nil
+	}
+
+	section := "Links"
+	if s, ok := argsMap["section"].(string); ok && s != "" {
+		section = s
+	}
+
+	if err := z.store.AppendToSection(slug, section, text); err != nil {
+		return errorResult(fmt.Sprintf("Append failed: %v", err)), nil
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{mcp.TextContent{Type: "text", Text: fmt.Sprintf("Appended to %q section of card %q", section, slug)}},
+	}, nil
 }
 
 func (z *ZettelServer) makeLinksTool() server.ServerTool {

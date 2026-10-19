@@ -13,6 +13,7 @@
  *   zettel_search  – full-text search cards (with status/category/date filters)
  *   zettel_read    – read a specific card by slug
  *   zettel_write   – write/update a card
+ *   zettel_append  – append a line to a card section (prose-safe)
  *   zettel_links   – show link graph stats or broken links
  *   zettel_organize – emit an organize report (orphans, hubs, conflicts, broken links)
  *   zettel_archive – archive a card
@@ -389,6 +390,43 @@ export default function zettelExtension(pi: ExtensionAPI) {
       if (!res.ok) return textResult(res.stderr, true);
       return textResult(
         appendStderrWarning(`Card '${slug}' written successfully.`, res.stderr),
+      );
+    },
+  });
+
+  // -----------------------------------------------------------------------
+  // Tool: zettel_append
+  // -----------------------------------------------------------------------
+
+  pi.registerTool({
+    name: "zettel_append",
+    label: "zettel Append",
+    description:
+      "Append a line to a card's section without touching existing prose (creates the section if absent). The safe primitive for append-only edits, e.g. adding '- [[slug]]: relationship' entries to ## Links. modified is bumped.",
+    parameters: Type.Object({
+      slug: Type.String({ description: "Card slug" }),
+      text: Type.String({
+        description: "Line to append, e.g. '- [[other-slug]]: why related'",
+      }),
+      section: Type.Optional(
+        Type.String({
+          description: "Section heading to append to (default: Links; created if absent)",
+        }),
+      ),
+    }),
+    async execute(_toolCallId, params) {
+      const { slug, text, section } = params as {
+        slug: string;
+        text: string;
+        section?: string;
+      };
+      const args = ["append", slug, "--text", text];
+      if (section) args.push("--section", section);
+
+      const res = await zettel(args);
+      if (!res.ok) return textResult(res.stderr, true);
+      return textResult(
+        appendStderrWarning(`Appended to '${slug}'.`, res.stderr),
       );
     },
   });

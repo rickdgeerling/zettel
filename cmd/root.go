@@ -26,6 +26,7 @@ func init() {
 	rootCmd.AddCommand(searchCmd)
 	rootCmd.AddCommand(readCmd)
 	rootCmd.AddCommand(writeCmd)
+	rootCmd.AddCommand(appendCmd)
 	rootCmd.AddCommand(linksCmd)
 	rootCmd.AddCommand(archiveCmd)
 	rootCmd.AddCommand(organizeCmd)
