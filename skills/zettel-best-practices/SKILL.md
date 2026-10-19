@@ -46,12 +46,13 @@ This relates to [[other-card]] because <explanation of the relationship>.
 
 ### Optional Frontmatter
 
-| Field      | Format               | Notes                                     |
-| ---------- | -------------------- | ----------------------------------------- |
-| `tags`     | YAML list            | See [Tag System](#tag-system) below       |
-| `category` | Single string        | See [Categories](#categories) below       |
-| `links`    | YAML list of slugs   | Explicit links (in addition to wikilinks) |
-| `status`   | `conflict` / `draft` | Set by organize skill when needed         |
+| Field        | Format               | Notes                                     |
+| ------------ | -------------------- | ----------------------------------------- |
+| `tags`       | YAML list            | See [Tag System](#tag-system) below       |
+| `category`   | Single string        | See [Categories](#categories) below       |
+| `links`      | YAML list of slugs   | Explicit links (in addition to wikilinks) |
+| `status`     | `conflict` / `draft` | Set by organize skill when needed         |
+| `description`| One line, ≤100 chars | What the card is about (not just the title). Rendered by the keyword index in place of the title and matched by search — write it at creation time |
 
 ### Body Rules
 

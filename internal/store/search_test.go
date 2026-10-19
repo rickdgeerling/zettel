@@ -318,3 +318,29 @@ func TestSearchModifiedSinceInclusiveBoundary(t *testing.T) {
 		t.Errorf("Expected boundary card included when modified equals since date, got %d", len(results))
 	}
 }
+
+func TestSearchMatchesDescription(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	// The query term appears only in the description, not title or body.
+	card := &Card{
+		Slug:        "desc-card",
+		Title:       "Unrelated Title",
+		Created:     time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC),
+		Description: "How to tune the connection pool under load",
+		Body:        "Body without the term.",
+	}
+	_ = s.WriteCard("desc-card", card, "test")
+
+	results, err := s.Search(SearchOptions{Query: "connection pool"})
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if len(results) != 1 || results[0].Slug != "desc-card" {
+		t.Fatalf("results = %v, want [desc-card]", results)
+	}
+	if results[0].Description != card.Description {
+		t.Errorf("Description = %q, want %q", results[0].Description, card.Description)
+	}
+}

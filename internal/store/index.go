@@ -46,7 +46,12 @@ func (s *Store) DraftIndex() (string, error) {
 		// Search results are sorted by slug, so entries within a
 		// category come out deterministically.
 		for _, c := range groups[cat] {
-			body.WriteString("- [[" + c.Slug + "]] — " + c.Title + "\n")
+			desc := strings.TrimSpace(c.Description)
+			desc = strings.ReplaceAll(desc, "\n", " ") // index entries are one line
+			if desc == "" {
+				desc = c.Title
+			}
+			body.WriteString("- [[" + c.Slug + "]] — " + desc + "\n")
 		}
 		body.WriteString("\n")
 	}

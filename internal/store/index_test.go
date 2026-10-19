@@ -68,3 +68,35 @@ func TestDraftIndexEmptyStore(t *testing.T) {
 		t.Errorf("empty draft not parseable: %v\n%s", err, draft)
 	}
 }
+
+func TestDraftIndexPrefersDescription(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	withDesc := &Card{Slug: "with-desc", Title: "Verbose Title", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Category: "backend", Description: "One-line summary.", Body: "Content"}
+	_ = s.WriteCard("with-desc", withDesc, "test")
+
+	multiLine := &Card{Slug: "multiline-desc", Title: "Multi", Created: time.Date(2025, 1, 16, 0, 0, 0, 0, time.UTC), Category: "backend", Description: "line one\nline two", Body: "Content"}
+	_ = s.WriteCard("multiline-desc", multiLine, "test")
+
+	withoutDesc := &Card{Slug: "without-desc", Title: "Fallback Title", Created: time.Date(2025, 1, 17, 0, 0, 0, 0, time.UTC), Category: "backend", Body: "Content"}
+	_ = s.WriteCard("without-desc", withoutDesc, "test")
+
+	draft, err := s.DraftIndex()
+	if err != nil {
+		t.Fatalf("DraftIndex failed: %v", err)
+	}
+
+	parsed, _ := UnmarshalCard("index", []byte(draft))
+	body := parsed.Body
+
+	if !strings.Contains(body, "- [[with-desc]] — One-line summary.") {
+		t.Errorf("description not rendered:\n%s", body)
+	}
+	if !strings.Contains(body, "- [[multiline-desc]] — line one line two") {
+		t.Errorf("multi-line description not flattened:\n%s", body)
+	}
+	if !strings.Contains(body, "- [[without-desc]] — Fallback Title") {
+		t.Errorf("title fallback missing:\n%s", body)
+	}
+}

@@ -35,6 +35,22 @@ output=$($ZETTEL read test-card)
 echo "$output" | grep -q "Test Card" || { echo "Read failed: title not found"; exit 1; }
 echo "$output" | grep -q "This is the body" || { echo "Body mismatch"; exit 1; }
 
+# A second card with a description (rendered by the index draft)
+cat << 'EOF' | $ZETTEL write desc-card
+---
+title: Described Card
+created: 2025-01-16
+category: misc
+description: Entry text supplied by frontmatter
+---
+
+Described body.
+EOF
+
+# Search matches the description too
+results=$($ZETTEL search "supplied by frontmatter")
+echo "$results" | grep -q "desc-card" || { echo "Search by description failed"; exit 1; }
+
 # Search for it
 results=$($ZETTEL search "Test")
 echo "$results" | grep -q "test-card" || { echo "Search failed"; exit 1; }
@@ -51,7 +67,7 @@ echo "$broken_output" | grep -q "test-card -> \[\[link\]\] (missing)" || { echo 
 
 # Organize report as JSON (must be valid JSON on stdout, store-path banner is stderr-only)
 organize_json=$($ZETTEL organize --json 2>/dev/null)
-echo "$organize_json" | jq -e '.total == 2' > /dev/null || { echo "organize --json: total field wrong: $organize_json"; exit 1; }
+echo "$organize_json" | jq -e '.total == 3' > /dev/null || { echo "organize --json: total field wrong: $organize_json"; exit 1; }
 echo "$organize_json" | jq -e '.broken_links[0].to == "link" and .broken_links[0].kind == "missing"' > /dev/null || { echo "organize --json: broken_links shape wrong: $organize_json"; exit 1; }
 echo "$organize_json" | jq -e '.broken_links != null and .orphans != null and .hubs != null' > /dev/null || { echo "organize --json: fields must never be null: $organize_json"; exit 1; }
 
@@ -64,6 +80,7 @@ cat "$PROJECT_DIR/.zettel/.last-organize" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2
 # Draft keyword index: groups cards by category, never indexes itself
 draft=$($ZETTEL index --quiet 2>/dev/null)
 echo "$draft" | grep -q '^- \[\[test-card\]\] — Test Card$' || { echo "index draft missing card entry: $draft"; exit 1; }
+echo "$draft" | grep -q '^- \[\[desc-card\]\] — Entry text supplied by frontmatter$' || { echo "index draft missing description entry: $draft"; exit 1; }
 echo "$draft" | grep -q '\[\[index\]\]' && { echo "index draft indexes itself: $draft"; exit 1; }
 echo "$draft" | head -1 | grep -q '^---$' || { echo "index draft lacks standard delimiters"; exit 1; }
 

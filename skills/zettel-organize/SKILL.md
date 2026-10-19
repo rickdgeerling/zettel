@@ -79,8 +79,8 @@ The keyword index (`index` card) is a curated concept → card mapping, inspired
 
 After completing all checks, draft the index:
 
-1. Run `zettel index` (or `zettel_index`) — it emits a draft index card with every active card grouped by its frontmatter `category`, titles as placeholder descriptions. Navigation cards are excluded; an existing index's `created` date is preserved
-2. Edit the draft using judgment: rewrite placeholder descriptions into accurate one-liners, move cards between categories where the frontmatter category is wrong
+1. Run `zettel index` (or `zettel_index`) — it emits a draft index card with every active card grouped by its frontmatter `category`. Entries render the card's `description` frontmatter when present, falling back to the title. Navigation cards are excluded; an existing index's `created` date is preserved
+2. Edit the draft using judgment: for cards still showing their title, write a one-line `description` into the card's frontmatter (`zettel write`) rather than only fixing the index — descriptions live on cards so redrafts keep them; move cards between categories where the frontmatter category is wrong
 3. Save the result with `zettel write index`
 
 ```markdown

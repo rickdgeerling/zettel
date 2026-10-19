@@ -38,7 +38,7 @@ bash test/cli_integration.sh      # end-to-end CLI test
 - New precedence: `--store` flag > walk up from CWD > `ZETTEL_HOME` env var
 
 ### Card Format
-- Markdown files with YAML frontmatter: `title`, `created`, `modified`, `source`, `tags`, `category`, `status`
+- Markdown files with YAML frontmatter: `title`, `created`, `modified`, `source`, `tags`, `category`, `status`, plus optional `description` (one-line summary, rendered by the keyword index and matched by search)
 - `[[wikilink]]` syntax for cross-references (kebab-case slugs)
 - `slug` is the filename (minus `.md`), validated: lowercase alphanumeric + hyphens, 2-60 chars
 

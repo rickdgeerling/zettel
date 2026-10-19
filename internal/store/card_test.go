@@ -222,3 +222,31 @@ func TestUnmarshalCardLegacyFormat(t *testing.T) {
 		t.Errorf("Body = %q, want %q", parsed.Body, "Legacy body.\n")
 	}
 }
+
+func TestCardDescriptionRoundTrip(t *testing.T) {
+	card := &Card{
+		Slug:        "with-desc",
+		Title:       "With Description",
+		Created:     time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC),
+		Description: "What this card is about, in one line.",
+		Body:        "Body.",
+	}
+
+	content := card.Marshal()
+	parsed, err := UnmarshalCard("with-desc", []byte(content))
+	if err != nil {
+		t.Fatalf("UnmarshalCard failed: %v", err)
+	}
+	if parsed.Description != card.Description {
+		t.Errorf("Description mismatch: got %q, want %q", parsed.Description, card.Description)
+	}
+	if got := parsed.Marshal(); got != content {
+		t.Errorf("Marshal not stable with description:\ngot:  %q\nwant: %q", got, content)
+	}
+
+	// Absent description must stay absent (omitempty), not emit an empty field.
+	without := &Card{Slug: "no-desc", Title: "No Description", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "Body."}
+	if got := without.Marshal(); strings.Contains(got, "description:") {
+		t.Errorf("empty description emitted:\n%s", got)
+	}
+}

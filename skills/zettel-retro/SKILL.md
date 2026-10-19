@@ -70,6 +70,7 @@ title: <descriptive title>
 created: <today's date YYYY-MM-DD>
 source: <auto-filled by client>
 category: <optional category>
+description: <optional one-line summary, ≤100 chars — what the card is about, not just the title>
 tags: <optional tags>
 ---
 

@@ -308,6 +308,12 @@ export default function zettelExtension(pi: ExtensionAPI) {
       title: Type.String({
         description: "Card title (≤60 chars, noun phrase not sentence)",
       }),
+      description: Type.Optional(
+        Type.String({
+          description:
+            "One-line description of the insight (≤100 chars) — rendered by the keyword index and matched by search, so future recall can tell what the card is about without reading it",
+        }),
+      ),
       body: Type.String({
         description:
           "Card body in markdown with [[wikilinks]] explaining relationships",
@@ -326,11 +332,12 @@ export default function zettelExtension(pi: ExtensionAPI) {
       ),
     }),
     async execute(_toolCallId, params) {
-      const { slug, title, body, category } = params as {
+      const { slug, title, body, category, description } = params as {
         slug: string;
         title: string;
         body: string;
         category?: string;
+        description?: string;
       };
 
       const today = new Date().toISOString().split("T")[0];
@@ -340,6 +347,7 @@ export default function zettelExtension(pi: ExtensionAPI) {
         source: "pi",
       };
       if (category) frontmatter.category = category;
+      if (description) frontmatter.description = description;
 
       const yaml = Object.entries(frontmatter)
         .map(([k, v]) => `${k}: ${v}`)

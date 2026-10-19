@@ -18,17 +18,22 @@ type Card struct {
 	Tags     []string  `yaml:"tags"`
 	Category string    `yaml:"category"`
 	Status   string    `yaml:"status"`
-	Body     string
+	// Description is an optional one-line summary of the card. The
+	// keyword index renders it in place of the title, and search matches
+	// it, so recall can surface what a card is about without reading it.
+	Description string
+	Body        string
 }
 
 type frontmatter struct {
-	Title    string    `yaml:"title"`
-	Created  time.Time `yaml:"created"`
-	Modified time.Time `yaml:"modified"`
-	Source   string    `yaml:"source"`
-	Tags     []string  `yaml:"tags"`
-	Category string    `yaml:"category"`
-	Status   string    `yaml:"status"`
+	Title       string    `yaml:"title"`
+	Created     time.Time `yaml:"created"`
+	Modified    time.Time `yaml:"modified"`
+	Source      string    `yaml:"source"`
+	Tags        []string  `yaml:"tags"`
+	Category    string    `yaml:"category"`
+	Status      string    `yaml:"status"`
+	Description string    `yaml:"description,omitempty"`
 }
 
 var wikilinkRegex = regexp.MustCompile(`\[\[([a-z0-9][a-z0-9-]*[a-z0-9])\]\]`)
@@ -70,13 +75,14 @@ func ExtractWikilinks(body string) []string {
 
 func (c *Card) Marshal() string {
 	fm := frontmatter{
-		Title:    c.Title,
-		Created:  c.Created,
-		Modified: c.Modified,
-		Source:   c.Source,
-		Tags:     c.Tags,
-		Category: c.Category,
-		Status:   c.Status,
+		Title:       c.Title,
+		Created:     c.Created,
+		Modified:    c.Modified,
+		Source:      c.Source,
+		Tags:        c.Tags,
+		Category:    c.Category,
+		Status:      c.Status,
+		Description: c.Description,
 	}
 
 	var buf bytes.Buffer
@@ -109,15 +115,16 @@ func UnmarshalCard(slug string, data []byte) (*Card, error) {
 	}
 
 	return &Card{
-		Slug:     slug,
-		Title:    fm.Title,
-		Created:  fm.Created,
-		Modified: fm.Modified,
-		Source:   fm.Source,
-		Tags:     fm.Tags,
-		Category: fm.Category,
-		Status:   fm.Status,
-		Body:     body,
+		Slug:        slug,
+		Title:       fm.Title,
+		Created:     fm.Created,
+		Modified:    fm.Modified,
+		Source:      fm.Source,
+		Tags:        fm.Tags,
+		Category:    fm.Category,
+		Status:      fm.Status,
+		Description: fm.Description,
+		Body:        body,
 	}, nil
 }
 

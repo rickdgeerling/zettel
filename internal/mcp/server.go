@@ -295,8 +295,12 @@ func (z *ZettelServer) handleSearch(args any) (*mcp.CallToolResult, error) {
 		if len(r.Tags) > 0 {
 			tagsStr = " [" + strings.Join(r.Tags, ", ") + "]"
 		}
-		line := fmt.Sprintf("%s | %s%s | cat=%s | status=%s | created=%s modified=%s",
-			r.Slug, r.Title, tagsStr, r.Category, r.Status, r.Created, r.Modified)
+		descStr := ""
+		if r.Description != "" {
+			descStr = " — " + r.Description
+		}
+		line := fmt.Sprintf("%s | %s%s%s | cat=%s | status=%s | created=%s modified=%s",
+			r.Slug, r.Title, descStr, tagsStr, r.Category, r.Status, r.Created, r.Modified)
 		lines = append(lines, line)
 	}
 

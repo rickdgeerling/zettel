@@ -9,13 +9,14 @@ import (
 )
 
 type CardMetadata struct {
-	Slug     string
-	Title    string
-	Tags     []string
-	Category string
-	Status   string
-	Created  string
-	Modified string
+	Slug        string
+	Title       string
+	Tags        []string
+	Category    string
+	Status      string
+	Description string
+	Created     string
+	Modified    string
 }
 
 // SearchOptions describes a card search. All fields are optional; the zero
@@ -61,13 +62,14 @@ func (s *Store) Search(opts SearchOptions) ([]CardMetadata, error) {
 		}
 
 		results = append(results, CardMetadata{
-			Slug:     card.Slug,
-			Title:    card.Title,
-			Tags:     card.Tags,
-			Category: card.Category,
-			Status:   card.Status,
-			Created:  card.Created.Format("2006-01-02"),
-			Modified: card.Modified.Format("2006-01-02"),
+			Slug:        card.Slug,
+			Title:       card.Title,
+			Tags:        card.Tags,
+			Category:    card.Category,
+			Status:      card.Status,
+			Description: card.Description,
+			Created:     card.Created.Format("2006-01-02"),
+			Modified:    card.Modified.Format("2006-01-02"),
 		})
 	}
 
@@ -114,6 +116,9 @@ func matchesSearch(card *Card, opts SearchOptions) bool {
 		q := strings.ToLower(opts.Query)
 		found := false
 		if strings.Contains(strings.ToLower(card.Title), q) {
+			found = true
+		}
+		if strings.Contains(strings.ToLower(card.Description), q) {
 			found = true
 		}
 		if strings.Contains(strings.ToLower(card.Body), q) {

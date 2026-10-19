@@ -59,8 +59,12 @@ var searchCmd = &cobra.Command{
 			if len(r.Tags) > 0 {
 				tags = " [" + strings.Join(r.Tags, ", ") + "]"
 			}
-			fmt.Printf("%s | %s%s | cat=%s | status=%s | created=%s modified=%s\n",
-				r.Slug, r.Title, tags, r.Category, r.Status, r.Created, r.Modified)
+			desc := ""
+			if r.Description != "" {
+				desc = " — " + r.Description
+			}
+			fmt.Printf("%s | %s%s%s | cat=%s | status=%s | created=%s modified=%s\n",
+				r.Slug, r.Title, desc, tags, r.Category, r.Status, r.Created, r.Modified)
 		}
 
 		if searchLimit > 0 && len(results) == int(searchLimit) {
