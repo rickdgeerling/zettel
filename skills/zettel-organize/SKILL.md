@@ -49,15 +49,15 @@ digraph organize {
 }
 ```
 
-1. Run `zettel organize` to get the organize report. It emits orphans, hubs, unresolved conflicts, recently modified cards (paired with their neighbors), and broken links in one shot.
-2. **Orphan detection**: For cards with 0 inbound links (the "Orphans" section):
+1. Run `zettel organize` to get the organize report. It emits orphans, hubs, unresolved conflicts, recently modified cards (paired with their inbound/outbound neighbors), and broken links in one shot. The run also stamps `.last-organize` with the run date automatically (see Incremental Strategy).
+2. **Orphan detection**: For cards with 0 inbound links (the "Orphans" section — navigation cards like `index` and `*-index` are excluded by design):
    - `zettel read` the orphan
    - `zettel search` for potentially related cards
    - Decide: append a link from a related card to this orphan, or leave alone if truly standalone
 3. **Hub detection**: For cards with >= 10 inbound links (the "Hubs" section):
    - `zettel read` the hub and its linkers
    - Decide: is this card too broad? Should it be split into smaller atomic concepts?
-4. **Contradiction/staleness detection**: The "Recently Modified" section lists recently modified cards paired with their neighbors. For each pair:
+4. **Contradiction/staleness detection**: The "Recently Modified" section lists recently modified cards with their neighbors, direction-marked: `→ slug` are cards this card links to (outbound), `← slug` are cards linking to it (inbound). For each pair:
    - Read both cards' content (`zettel read` for full content if needed)
    - Determine: do these cards **genuinely contradict** each other, or is one simply an **evolution** of the other?
    - **If evolution** (new info supersedes old): merge the cards — append the old card's unique content to the new one, then `zettel archive` the old card
@@ -66,7 +66,7 @@ digraph organize {
 5. **Resolve existing conflicts**: Check the "Unresolved Conflicts" section. For each card with `status: conflict`:
    - Surface it to the user: "Card X conflicts with card Y — which perspective should we keep?"
    - If the user resolves it, remove `status: conflict` from frontmatter and merge/archive as directed
-6. **Fix broken links**: Check the "Broken Links" section. For each `[[slug]]` that points to a missing or archived card:
+6. **Fix broken links**: Check the "Broken Links" section. Each `[[slug]]` pointing to a missing or archived card may carry a `did you mean [[other-slug]]?` suggestion — the nearest existing card by name similarity. Verify the suggestion actually matches the intended concept before re-pointing, then:
    - If the target is archived and the reference is stale, edit the referring card to remove or re-point the link
    - If the target is missing (never existed), remove the link or create the card
 7. **Rebuild keyword index** (always, as last step)
@@ -118,7 +118,7 @@ Use `zettel write index` to save the index.
    zettel search --modified-since <last-run-date>
    ```
 3. If the file doesn't exist, this is the first run — process all cards
-4. After completing all checks, write today's date to `$(zettel store-path --quiet)/.last-organize` (use actual date)
+4. After the run, no manual stamping is needed: `zettel organize` (CLI and MCP) writes today's date to `$(zettel store-path --quiet)/.last-organize` automatically when it emits the report
 
 To find unresolved conflicts without grepping the filesystem, use:
 ```

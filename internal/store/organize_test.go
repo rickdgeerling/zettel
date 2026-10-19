@@ -2,6 +2,8 @@ package store
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -135,6 +137,90 @@ func TestOrganizeReportJSON(t *testing.T) {
 	}
 	if _, ok := broken[0]["From"]; ok {
 		t.Errorf("broken_links entry has PascalCase key %q: %v", "From", broken[0])
+	}
+}
+
+func TestOrganizeReportSuppressesIndexOrphans(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	// Navigation cards link outward by design; reporting them as orphans
+	// every run is noise.
+	index := &Card{Slug: "index", Title: "Keyword Index", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "Keyword index card."}
+	_ = s.WriteCard("index", index, "test")
+
+	subIndex := &Card{Slug: "backend-index", Title: "Backend Sub-Index", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "overflow entries"}
+	_ = s.WriteCard("backend-index", subIndex, "test")
+
+	orphan := &Card{Slug: "orphan", Title: "Orphan", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "standalone"}
+	_ = s.WriteCard("orphan", orphan, "test")
+
+	report, err := s.OrganizeReport(time.Time{})
+	if err != nil {
+		t.Fatalf("OrganizeReport failed: %v", err)
+	}
+
+	if contains(report.Orphans, "index") {
+		t.Errorf("index listed as orphan: %v", report.Orphans)
+	}
+	if contains(report.Orphans, "backend-index") {
+		t.Errorf("sub-index listed as orphan: %v", report.Orphans)
+	}
+	if !contains(report.Orphans, "orphan") {
+		t.Errorf("genuine orphan missing from report: %v", report.Orphans)
+	}
+}
+
+func TestOrganizeReportNeighborDirections(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	a := &Card{Slug: "card-a", Title: "Card A", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "Links to [[card-b]]"}
+	_ = s.WriteCard("card-a", a, "test")
+	b := &Card{Slug: "card-b", Title: "Card B", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "No links"}
+	_ = s.WriteCard("card-b", b, "test")
+
+	report, err := s.OrganizeReport(time.Time{})
+	if err != nil {
+		t.Fatalf("OrganizeReport failed: %v", err)
+	}
+
+	bySlug := map[string]RecentChange{}
+	for _, rc := range report.RecentlyModified {
+		bySlug[rc.Slug] = rc
+	}
+
+	ra := bySlug["card-a"]
+	if len(ra.Outbound) != 1 || ra.Outbound[0] != "card-b" {
+		t.Errorf("card-a outbound = %v, want [card-b]", ra.Outbound)
+	}
+	if len(ra.Inbound) != 0 {
+		t.Errorf("card-a inbound = %v, want []", ra.Inbound)
+	}
+
+	rb := bySlug["card-b"]
+	if len(rb.Inbound) != 1 || rb.Inbound[0] != "card-a" {
+		t.Errorf("card-b inbound = %v, want [card-a]", rb.Inbound)
+	}
+	if len(rb.Outbound) != 0 {
+		t.Errorf("card-b outbound = %v, want []", rb.Outbound)
+	}
+}
+
+func TestStampLastOrganize(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	if err := s.StampLastOrganizeAt(time.Date(2026, 3, 5, 22, 15, 0, 0, time.FixedZone("test", 2*3600))); err != nil {
+		t.Fatalf("StampLastOrganizeAt failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(s.Root, LastOrganizeFile))
+	if err != nil {
+		t.Fatalf("stamp file not written: %v", err)
+	}
+	if got, want := string(data), "2026-03-05\n"; got != want {
+		t.Errorf("stamp content = %q, want %q", got, want)
 	}
 }
 

@@ -55,6 +55,12 @@ echo "$organize_json" | jq -e '.total == 2' > /dev/null || { echo "organize --js
 echo "$organize_json" | jq -e '.broken_links[0].to == "link" and .broken_links[0].kind == "missing"' > /dev/null || { echo "organize --json: broken_links shape wrong: $organize_json"; exit 1; }
 echo "$organize_json" | jq -e '.broken_links != null and .orphans != null and .hubs != null' > /dev/null || { echo "organize --json: fields must never be null: $organize_json"; exit 1; }
 
+echo "$organize_json" | jq -e '.recently_modified[0].inbound != null and .recently_modified[0].outbound != null' > /dev/null || { echo "organize --json: neighbor direction fields wrong: $organize_json"; exit 1; }
+
+# organize stamps .last-organize automatically
+test -f "$PROJECT_DIR/.zettel/.last-organize" || { echo "organize did not stamp .last-organize"; exit 1; }
+cat "$PROJECT_DIR/.zettel/.last-organize" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' || { echo ".last-organize has wrong format"; exit 1; }
+
 # Archive
 $ZETTEL archive test-card
 test -f "$PROJECT_DIR/.zettel/archived/test-card.md" || { echo "Archive failed: not in archived dir"; exit 1; }

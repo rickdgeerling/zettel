@@ -58,9 +58,10 @@ type brokenLinksOutput struct {
 }
 
 type brokenLinkInfo struct {
-	From string `json:"from"`
-	To   string `json:"to"`
-	Kind string `json:"kind"`
+	From       string `json:"from"`
+	To         string `json:"to"`
+	Kind       string `json:"kind"`
+	Suggestion string `json:"suggestion,omitempty"`
 }
 
 func runGlobalLinks() {
@@ -128,7 +129,7 @@ func runBrokenLinks() {
 	if linksJSON {
 		out := brokenLinksOutput{Broken: make([]brokenLinkInfo, 0, len(broken))}
 		for _, b := range broken {
-			out.Broken = append(out.Broken, brokenLinkInfo{From: b.From, To: b.To, Kind: b.Kind})
+			out.Broken = append(out.Broken, brokenLinkInfo{From: b.From, To: b.To, Kind: b.Kind, Suggestion: b.Suggestion})
 		}
 		data, _ := json.MarshalIndent(out, "", "  ")
 		fmt.Println(string(data))
@@ -143,7 +144,7 @@ func runBrokenLinks() {
 	fmt.Println("Broken Links:")
 	fmt.Println("-------------")
 	for _, b := range broken {
-		fmt.Printf("  %s -> [[%s]] (%s)\n", b.From, b.To, b.Kind)
+		fmt.Printf("  %s\n", formatBrokenLink(b))
 	}
 	fmt.Printf("\nSummary: %d broken links\n", len(broken))
 }

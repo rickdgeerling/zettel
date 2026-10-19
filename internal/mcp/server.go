@@ -490,11 +490,8 @@ func (z *ZettelServer) handleOrganize(args any) (*mcp.CallToolResult, error) {
 		lines = append(lines, "  (none)")
 	} else {
 		for _, rc := range report.RecentlyModified {
-			neighbors := "(no links)"
-			if len(rc.Neighbors) > 0 {
-				neighbors = strings.Join(rc.Neighbors, ", ")
-			}
-			lines = append(lines, fmt.Sprintf("  %s (modified %s) — neighbors: %s", rc.Slug, rc.Modified, neighbors))
+			lines = append(lines, fmt.Sprintf("  %s (modified %s) — out: %s | in: %s",
+				rc.Slug, rc.Modified, markNeighbors(rc.Outbound, "→"), markNeighbors(rc.Inbound, "←")))
 		}
 	}
 
@@ -503,10 +500,18 @@ func (z *ZettelServer) handleOrganize(args any) (*mcp.CallToolResult, error) {
 		lines = append(lines, "  (none)")
 	} else {
 		for _, b := range report.BrokenLinks {
-			lines = append(lines, fmt.Sprintf("  %s -> [[%s]] (%s)", b.From, b.To, b.Kind))
+			if b.Suggestion != "" {
+				lines = append(lines, fmt.Sprintf("  %s -> [[%s]] (%s, did you mean [[%s]]?)", b.From, b.To, b.Kind, b.Suggestion))
+			} else {
+				lines = append(lines, fmt.Sprintf("  %s -> [[%s]] (%s)", b.From, b.To, b.Kind))
+			}
 		}
 	}
 
+	// Record the run date for the next incremental run.
+	if err := z.store.StampLastOrganize(); err != nil {
+		return errorResult(fmt.Sprintf("Failed to stamp last-organize date: %v", err)), nil
+	}
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{mcp.TextContent{Type: "text", Text: strings.Join(lines, "\n")}},
 	}, nil
@@ -517,4 +522,17 @@ func errorResult(msg string) *mcp.CallToolResult {
 		Content: []mcp.Content{mcp.TextContent{Type: "text", Text: msg}},
 		IsError: true,
 	}
+}
+
+// markNeighbors renders a neighbor list with direction markers (→ out,
+// ← in).
+func markNeighbors(slugs []string, marker string) string {
+	if len(slugs) == 0 {
+		return "(none)"
+	}
+	parts := make([]string, len(slugs))
+	for i, s := range slugs {
+		parts[i] = marker + s
+	}
+	return strings.Join(parts, ", ")
 }

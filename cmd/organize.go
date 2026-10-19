@@ -48,11 +48,23 @@ since the last organize run.`,
 				os.Exit(1)
 			}
 			fmt.Println(string(data))
+			stampLastOrganize()
 			return
 		}
 
 		printOrganizeReport(report, since)
+		stampLastOrganize()
 	},
+}
+
+// stampLastOrganize records the run date so the next incremental run can
+// use it as --since. Report output is already complete by the time this
+// runs, so a stamping failure never eats the report.
+func stampLastOrganize() {
+	if err := GetStore().StampLastOrganize(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func printOrganizeReport(report *store.OrganizeReport, since time.Time) {
@@ -96,11 +108,8 @@ func printOrganizeReport(report *store.OrganizeReport, since time.Time) {
 		fmt.Println("  (none)")
 	} else {
 		for _, rc := range report.RecentlyModified {
-			neighbors := "(no links)"
-			if len(rc.Neighbors) > 0 {
-				neighbors = strings.Join(rc.Neighbors, ", ")
-			}
-			fmt.Printf("  %s (modified %s) — neighbors: %s\n", rc.Slug, rc.Modified, neighbors)
+			fmt.Printf("  %s (modified %s) — out: %s | in: %s\n",
+				rc.Slug, rc.Modified, markNeighbors(rc.Outbound, "→"), markNeighbors(rc.Inbound, "←"))
 		}
 	}
 
@@ -109,9 +118,31 @@ func printOrganizeReport(report *store.OrganizeReport, since time.Time) {
 		fmt.Println("  (none)")
 	} else {
 		for _, b := range report.BrokenLinks {
-			fmt.Printf("  %s -> [[%s]] (%s)\n", b.From, b.To, b.Kind)
+			fmt.Printf("  %s\n", formatBrokenLink(b))
 		}
 	}
+}
+
+// markNeighbors renders a neighbor list with direction markers (→ out,
+// ← in).
+func markNeighbors(slugs []string, marker string) string {
+	if len(slugs) == 0 {
+		return "(none)"
+	}
+	parts := make([]string, len(slugs))
+	for i, s := range slugs {
+		parts[i] = marker + s
+	}
+	return strings.Join(parts, ", ")
+}
+
+// formatBrokenLink renders one broken-link line, including the "did you
+// mean" suggestion when one exists.
+func formatBrokenLink(b store.BrokenLink) string {
+	if b.Suggestion != "" {
+		return fmt.Sprintf("%s -> [[%s]] (%s, did you mean [[%s]]?)", b.From, b.To, b.Kind, b.Suggestion)
+	}
+	return fmt.Sprintf("%s -> [[%s]] (%s)", b.From, b.To, b.Kind)
 }
 
 func init() {

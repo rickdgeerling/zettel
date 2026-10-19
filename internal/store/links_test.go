@@ -239,3 +239,47 @@ func TestBrokenLinksNone(t *testing.T) {
 		t.Errorf("Expected no broken links, got %v", broken)
 	}
 }
+
+func TestBrokenLinkSuggestions(t *testing.T) {
+	tmp := t.TempDir()
+	s, _ := Init(tmp)
+
+	// Near-miss targets taken from a real organize run: each broken slug
+	// is a wrong name for an existing concept.
+	cards := []*Card{
+		{Slug: "linker", Title: "Linker", Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), Body: "Refs [[notification-opt-in-vs-out]], [[observability-agent-memory]], [[deterministic-job-id-dedup]] and [[zzz-qqq]]"},
+		{Slug: "incident-notification-opt-in-vs-out", Title: "Incident Notifications", Created: time.Date(2025, 1, 16, 0, 0, 0, 0, time.UTC), Body: "Content"},
+		{Slug: "agent-memory-edit-tool-design", Title: "Agent Memory Edits", Created: time.Date(2025, 1, 17, 0, 0, 0, 0, time.UTC), Body: "Content"},
+		{Slug: "bull-job-id-concurrency-filtering", Title: "Bull Job Ids", Created: time.Date(2025, 1, 18, 0, 0, 0, 0, time.UTC), Body: "Content"},
+		{Slug: "go-gc-pauses", Title: "GC Pauses", Created: time.Date(2025, 1, 19, 0, 0, 0, 0, time.UTC), Body: "Content"},
+	}
+	for _, c := range cards {
+		_ = s.WriteCard(c.Slug, c, "test")
+	}
+
+	broken, err := s.BrokenLinks()
+	if err != nil {
+		t.Fatalf("BrokenLinks failed: %v", err)
+	}
+
+	byTarget := map[string]BrokenLink{}
+	for _, b := range broken {
+		byTarget[b.To] = b
+	}
+
+	wantSuggestion := map[string]string{
+		"notification-opt-in-vs-out": "incident-notification-opt-in-vs-out", // substring embed
+		"observability-agent-memory": "agent-memory-edit-tool-design",       // shared "agent-memory" run
+		"deterministic-job-id-dedup": "bull-job-id-concurrency-filtering",   // shared "job-id" run
+	}
+	for target, want := range wantSuggestion {
+		got := byTarget[target].Suggestion
+		if got != want {
+			t.Errorf("suggestion for %q = %q, want %q", target, got, want)
+		}
+	}
+
+	if got := byTarget["zzz-qqq"].Suggestion; got != "" {
+		t.Errorf("dissimilar target %q got suggestion %q, want none", "zzz-qqq", got)
+	}
+}

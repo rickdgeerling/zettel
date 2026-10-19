@@ -9,6 +9,10 @@ import (
 const (
 	CardsDirName    = "cards"
 	ArchivedDirName = "archived"
+
+	// LastOrganizeFile holds the date of the last organize run (YYYY-MM-DD)
+	// so incremental runs can pick up where the previous one left off.
+	LastOrganizeFile = ".last-organize"
 )
 
 type Store struct {

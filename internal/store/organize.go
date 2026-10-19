@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -8,13 +9,15 @@ import (
 	"time"
 )
 
-// RecentChange pairs a recently modified card with the neighbors it links to
-// or is linked from. The organize skill uses these pairs to decide between
+// RecentChange pairs a recently modified card with its link partners,
+// split by direction: Inbound are cards linking to it, Outbound are cards
+// it links to. The organize skill uses these pairs to decide between
 // "genuine contradiction" and "evolution".
 type RecentChange struct {
-	Slug      string   `json:"slug"`
-	Modified  string   `json:"modified"`
-	Neighbors []string `json:"neighbors"`
+	Slug     string   `json:"slug"`
+	Modified string   `json:"modified"`
+	Inbound  []string `json:"inbound"`  // ← cards referencing this card
+	Outbound []string `json:"outbound"` // → cards this card references
 }
 
 // OrganizeReport is the output of a maintenance pass: the set of orphans,
@@ -32,6 +35,8 @@ type OrganizeReport struct {
 // OrganizeReport builds the maintenance report for active cards. When since
 // is non-zero, RecentlyModified is limited to cards modified on or after that
 // date (orphans, hubs, and conflicts are always computed across all cards).
+// Navigation cards (the keyword index and category sub-indexes) are never
+// reported as orphans: they link outward by design.
 func (s *Store) OrganizeReport(since time.Time) (*OrganizeReport, error) {
 	graph, err := s.LinkGraph()
 	if err != nil {
@@ -68,7 +73,7 @@ func (s *Store) OrganizeReport(since time.Time) (*OrganizeReport, error) {
 		}
 
 		stats := graph[slug]
-		if stats.Inbound == 0 {
+		if stats.Inbound == 0 && !isIndexSlug(slug) {
 			report.Orphans = append(report.Orphans, slug)
 		} else if stats.Inbound >= 10 {
 			report.Hubs = append(report.Hubs, slug)
@@ -79,10 +84,12 @@ func (s *Store) OrganizeReport(since time.Time) (*OrganizeReport, error) {
 		}
 
 		if since.IsZero() || !card.Modified.Before(since) {
+			inbound, outbound := s.linkedNeighbors(slug)
 			report.RecentlyModified = append(report.RecentlyModified, RecentChange{
-				Slug:      slug,
-				Modified:  card.Modified.Format("2006-01-02"),
-				Neighbors: s.linkedNeighbors(slug),
+				Slug:     slug,
+				Modified: card.Modified.Format("2006-01-02"),
+				Inbound:  inbound,
+				Outbound: outbound,
 			})
 		}
 	}
@@ -101,19 +108,44 @@ func (s *Store) OrganizeReport(since time.Time) (*OrganizeReport, error) {
 	return report, nil
 }
 
-func (s *Store) linkedNeighbors(slug string) []string {
+// isIndexSlug reports whether slug is a navigation card: the keyword
+// index or a category sub-index. Index cards exist to link outward and
+// are never legitimately "orphaned", so organize reports skip them.
+func isIndexSlug(slug string) bool {
+	return slug == "index" || strings.HasSuffix(slug, "-index")
+}
+
+// linkedNeighbors returns the sorted inbound and outbound link partners
+// for a card so report consumers can tell direction.
+func (s *Store) linkedNeighbors(slug string) (inbound []string, outbound []string) {
 	inbound, outbound, err := s.LinksForCard(slug)
 	if err != nil {
-		return []string{}
+		return []string{}, []string{}
 	}
-	seen := map[string]bool{}
-	neighbors := []string{}
-	for _, n := range append(inbound, outbound...) {
-		if !seen[n] {
-			seen[n] = true
-			neighbors = append(neighbors, n)
-		}
+	if inbound == nil {
+		inbound = []string{}
 	}
-	sort.Strings(neighbors)
-	return neighbors
+	if outbound == nil {
+		outbound = []string{}
+	}
+	sort.Strings(inbound)
+	sort.Strings(outbound)
+	return inbound, outbound
+}
+
+// StampLastOrganize records the date of this organize run so the next
+// incremental run can use it as --since.
+func (s *Store) StampLastOrganize() error {
+	return s.StampLastOrganizeAt(time.Now())
+}
+
+// StampLastOrganizeAt is StampLastOrganize with an explicit timestamp
+// (UTC, truncated to the day) for testability.
+func (s *Store) StampLastOrganizeAt(t time.Time) error {
+	path := filepath.Join(s.Root, LastOrganizeFile)
+	content := []byte(t.UTC().Format("2006-01-02") + "\n")
+	if err := os.WriteFile(path, content, 0644); err != nil {
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+	return nil
 }
