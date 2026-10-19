@@ -8,7 +8,12 @@
  * Prerequisites: go install github.com/rickdgeerling/zettel
  *
  * Tools registered:
- *   zettel_recall  – retrieve memory index or search (call at task start)
+ *   zettel_recall  – retrieve memory index or search (call at task start).
+ *                    The no-query result appends uncatalogued orphan cards
+ *                    (0 inbound links, unreachable from the index) so new
+ *                    cards since the last organize run are also known. When
+ *                    more than 10 cards are orphaned, the user is reminded
+ *                    (once per session) to run organize.
  *   zettel_retro   – save an atomic insight card (call at task end)
  *   zettel_search  – full-text search cards (with status/category/date filters)
  *   zettel_read    – read a specific card by slug
@@ -96,6 +101,30 @@ function toInt(v: unknown, fallback: number): number {
   return Number.isFinite(n) ? Math.floor(n) : fallback;
 }
 
+/** Parse the orphans array from `zettel organize --json` output; null when unparseable. */
+function parseOrphans(organizeJson: string): string[] | null {
+  try {
+    const report = JSON.parse(organizeJson) as { orphans?: unknown };
+    return Array.isArray(report.orphans) ? (report.orphans as string[]) : [];
+  } catch {
+    return null;
+  }
+}
+
+/** Cards with 0 inbound links are unreachable from the index — typically new cards since the last organize run. */
+function uncataloguedSection(orphans: string[]): string {
+  return [
+    "",
+    "## Uncatalogued cards (0 inbound links — not reachable from the index)",
+    "",
+    ...orphans.map((slug) => `- [[${slug}]]`),
+    "",
+  ].join("\n");
+}
+
+/** Remind the user to run organize when the orphan count crosses this threshold. */
+const ORGANIZE_REMINDER_THRESHOLD = 10;
+
 // ---------------------------------------------------------------------------
 // Extension
 // ---------------------------------------------------------------------------
@@ -104,6 +133,7 @@ export default function zettelExtension(pi: ExtensionAPI) {
   // Track whether recall/retro have been done this session
   let recallDone = false;
   let retroDone = false;
+  let organizeReminderSent = false;
 
   // -----------------------------------------------------------------------
   // Resource discovery — expose bundled skills to Pi
@@ -123,6 +153,7 @@ export default function zettelExtension(pi: ExtensionAPI) {
   pi.on("session_start", async (_event, _ctx) => {
     recallDone = false;
     retroDone = false;
+    organizeReminderSent = false;
   });
 
   // After compaction the recall reminder message is summarized away.
@@ -131,6 +162,30 @@ export default function zettelExtension(pi: ExtensionAPI) {
   pi.on("session_compact", async (_event, _ctx) => {
     recallDone = false;
   });
+
+  // Remind the user (once per session) to run organize when many cards
+  // are orphaned — by then the index has large blind spots.
+  function maybeRemindOrganize(orphans: string[] | null) {
+    if (
+      !orphans ||
+      orphans.length <= ORGANIZE_REMINDER_THRESHOLD ||
+      organizeReminderSent
+    ) {
+      return;
+    }
+    organizeReminderSent = true;
+    try {
+      pi.sendMessage(
+        {
+          customType: "zettel-organize-reminder",
+          content: `zettel: ${orphans.length} cards are orphaned (0 inbound links, likely missing from the index). Consider running the zettel-organize skill to integrate them.`,
+        },
+        { deliverAs: "nextTurn" },
+      );
+    } catch {
+      // Reminders are best-effort; never fail recall over them.
+    }
+  }
 
   // Inject recall reminder at the start of each agent turn (until recall is done)
   pi.on("before_agent_start", async (_event, _ctx) => {
@@ -186,7 +241,7 @@ export default function zettelExtension(pi: ExtensionAPI) {
     name: "zettel_recall",
     label: "zettel Recall",
     description:
-      "IMPORTANT: Call at the START of every task. Retrieves your persistent Zettelkasten memory — knowledge cards from previous sessions. Returns the keyword index (if exists) or card list. USAGE: Call with NO query first to get the index. Only use query when you need to find specific cards — pass 1-3 short keywords, NOT sentences or task summaries. Keyword search uses AND logic (every token must appear in the same card). For natural-language search, use zettel_search with semantic=true instead. Never include actual secrets, credentials, tokens, or exact secret file contents in query.",
+      "IMPORTANT: Call at the START of every task. Retrieves your persistent Zettelkasten memory — knowledge cards from previous sessions. Returns the keyword index (if exists) or card list, plus any uncatalogued orphan cards not reachable from the index. USAGE: Call with NO query first to get the index. Only use query when you need to find specific cards — pass 1-3 short keywords, NOT sentences or task summaries. Keyword search uses AND logic (every token must appear in the same card). For natural-language search, use zettel_search with semantic=true instead. Never include actual secrets, credentials, tokens, or exact secret file contents in query.",
     parameters: Type.Object({
       query: Type.Optional(
         Type.String({
@@ -207,10 +262,26 @@ export default function zettelExtension(pi: ExtensionAPI) {
         );
       }
 
+      // Orphan awareness: cards with 0 inbound links are unreachable from
+      // the index (typically new cards since the last organize run), so
+      // append them to keep recall complete. --no-stamp keeps this peek
+      // from advancing the incremental organize window.
+      const organizeRes = await zettel([
+        "organize",
+        "--json",
+        "--no-stamp",
+      ]);
+      const orphans = organizeRes.ok ? parseOrphans(organizeRes.stdout) : null;
+      maybeRemindOrganize(orphans);
+
       // Try index first, then fall back to listing all cards
       const indexRes = await zettel(["read", "index"]);
       if (indexRes.ok && indexRes.stdout) {
-        return textResult(indexRes.stdout);
+        let text = indexRes.stdout;
+        if (orphans && orphans.length > 0) {
+          text += "\n" + uncataloguedSection(orphans);
+        }
+        return textResult(text);
       }
 
       const listRes = await zettel(["search", "--limit", "10"]);

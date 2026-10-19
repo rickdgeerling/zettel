@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	organizeSince string
-	organizeJSON  bool
+	organizeSince   string
+	organizeJSON    bool
+	organizeNoStamp bool
 )
 
 var organizeCmd = &cobra.Command{
@@ -48,12 +49,16 @@ since the last organize run.`,
 				os.Exit(1)
 			}
 			fmt.Println(string(data))
-			stampLastOrganize()
+			if !organizeNoStamp {
+				stampLastOrganize()
+			}
 			return
 		}
 
 		printOrganizeReport(report, since)
-		stampLastOrganize()
+		if !organizeNoStamp {
+			stampLastOrganize()
+		}
 	},
 }
 
@@ -148,4 +153,5 @@ func formatBrokenLink(b store.BrokenLink) string {
 func init() {
 	organizeCmd.Flags().StringVar(&organizeSince, "since", "", "Only include recently modified cards since this date (YYYY-MM-DD)")
 	organizeCmd.Flags().BoolVar(&organizeJSON, "json", false, "Output as JSON")
+	organizeCmd.Flags().BoolVar(&organizeNoStamp, "no-stamp", false, "Do not update .last-organize (read-only peek at the report)")
 }
