@@ -16,6 +16,7 @@
  *   zettel_append  – append a line to a card section (prose-safe)
  *   zettel_links   – show link graph stats or broken links
  *   zettel_organize – emit an organize report (orphans, hubs, conflicts, broken links)
+ *   zettel_index    – emit a draft keyword index grouped by card category
  *   zettel_archive – archive a card
  *
  * Session lifecycle:
@@ -530,6 +531,23 @@ export default function zettelExtension(pi: ExtensionAPI) {
       const res = await zettel(args);
       if (!res.ok) return textResult(res.stderr, true);
       return textResult(res.stdout || `Card '${slug}' archived.`);
+    },
+  });
+
+  // -----------------------------------------------------------------------
+  // Tool: zettel_index
+  // -----------------------------------------------------------------------
+
+  pi.registerTool({
+    name: "zettel_index",
+    label: "zettel Index",
+    description:
+      "Emit a draft keyword index card: all active cards grouped by frontmatter category, titles as placeholder descriptions. Edit descriptions and category placement, then save with zettel_write (slug 'index').",
+    parameters: Type.Object({}),
+    async execute() {
+      const res = await zettel(["index"]);
+      if (!res.ok) return textResult(res.stderr, true);
+      return textResult(res.stdout);
     },
   });
 

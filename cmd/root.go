@@ -30,6 +30,7 @@ func init() {
 	rootCmd.AddCommand(linksCmd)
 	rootCmd.AddCommand(archiveCmd)
 	rootCmd.AddCommand(organizeCmd)
+	rootCmd.AddCommand(indexCmd)
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(storePathCmd)
 }

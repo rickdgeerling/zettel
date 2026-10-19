@@ -35,14 +35,6 @@ output=$($ZETTEL read test-card)
 echo "$output" | grep -q "Test Card" || { echo "Read failed: title not found"; exit 1; }
 echo "$output" | grep -q "This is the body" || { echo "Body mismatch"; exit 1; }
 
-# Append to a section (prose-safe edit)
-$ZETTEL append test-card --section "Links" --text "- [[other]]: related" > /dev/null 2>&1 || { echo "Append failed"; exit 1; }
-output=$($ZETTEL read test-card)
-echo "$output" | grep -q '\[\[other\]\]: related' || { echo "Append: new entry missing"; exit 1; }
-echo "$output" | grep -q 'This is the body' || { echo "Append: clobbered prose"; exit 1; }
-format=$(echo "$output" | grep -c '^---$')
-test "$format" -eq 2 || { echo "Append: expected standard frontmatter delimiters, got $format"; exit 1; }
-
 # Search for it
 results=$($ZETTEL search "Test")
 echo "$results" | grep -q "test-card" || { echo "Search failed"; exit 1; }
@@ -68,6 +60,20 @@ echo "$organize_json" | jq -e '.recently_modified[0].inbound != null and .recent
 # organize stamps .last-organize automatically
 test -f "$PROJECT_DIR/.zettel/.last-organize" || { echo "organize did not stamp .last-organize"; exit 1; }
 cat "$PROJECT_DIR/.zettel/.last-organize" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' || { echo ".last-organize has wrong format"; exit 1; }
+
+# Draft keyword index: groups cards by category, never indexes itself
+draft=$($ZETTEL index --quiet 2>/dev/null)
+echo "$draft" | grep -q '^- \[\[test-card\]\] — Test Card$' || { echo "index draft missing card entry: $draft"; exit 1; }
+echo "$draft" | grep -q '\[\[index\]\]' && { echo "index draft indexes itself: $draft"; exit 1; }
+echo "$draft" | head -1 | grep -q '^---$' || { echo "index draft lacks standard delimiters"; exit 1; }
+
+# Append to a section (prose-safe edit; adds a second outbound link)
+$ZETTEL append test-card --section "Links" --text "- [[other]]: related" > /dev/null 2>&1 || { echo "Append failed"; exit 1; }
+output=$($ZETTEL read test-card)
+echo "$output" | grep -q '\[\[other\]\]: related' || { echo "Append: new entry missing"; exit 1; }
+echo "$output" | grep -q 'This is the body' || { echo "Append: clobbered prose"; exit 1; }
+format=$(echo "$output" | grep -c '^---$')
+test "$format" -eq 2 || { echo "Append: expected standard frontmatter delimiters, got $format"; exit 1; }
 
 # Archive
 $ZETTEL archive test-card

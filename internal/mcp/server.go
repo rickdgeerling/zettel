@@ -31,6 +31,7 @@ func NewZettelServer(store *store.Store) *ZettelServer {
 		z.makeLinksTool(),
 		z.makeArchiveTool(),
 		z.makeOrganizeTool(),
+		z.makeIndexTool(),
 	)
 
 	return z
@@ -56,6 +57,8 @@ func (z *ZettelServer) handleTool(ctx context.Context, request mcp.CallToolReque
 		return z.handleArchive(request.Params.Arguments)
 	case "zettel_organize":
 		return z.handleOrganize(request.Params.Arguments)
+	case "zettel_index":
+		return z.handleIndex()
 	default:
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{mcp.TextContent{Type: "text", Text: "Unknown tool: " + request.Params.Name}},
@@ -568,6 +571,27 @@ func errorResult(msg string) *mcp.CallToolResult {
 		Content: []mcp.Content{mcp.TextContent{Type: "text", Text: msg}},
 		IsError: true,
 	}
+}
+
+func (z *ZettelServer) makeIndexTool() server.ServerTool {
+	tool := mcp.NewTool("zettel_index",
+		mcp.WithDescription("Emit a draft keyword index: every active card grouped by frontmatter category with titles as placeholder descriptions. Edit the descriptions and category placement, then save with zettel_write (slug 'index'). Turns index maintenance from authoring into editing."),
+	)
+	return server.ServerTool{
+		Tool:    tool,
+		Handler: z.handleTool,
+	}
+}
+
+func (z *ZettelServer) handleIndex() (*mcp.CallToolResult, error) {
+	draft, err := z.store.DraftIndex()
+	if err != nil {
+		return errorResult(fmt.Sprintf("DraftIndex failed: %v", err)), nil
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{mcp.TextContent{Type: "text", Text: draft}},
+	}, nil
 }
 
 // markNeighbors renders a neighbor list with direction markers (→ out,

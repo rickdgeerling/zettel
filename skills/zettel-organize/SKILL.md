@@ -18,6 +18,7 @@ Two equivalent interfaces exist — use whichever your environment supports:
 | `zettel links --broken`               | `zettel_links` with broken=true             |
 | `zettel links`                        | `zettel_links` with no args                 |
 | `zettel links <slug>`                 | `zettel_links` with slug arg                |
+| `zettel index`                        | `zettel_index`                              |
 | `zettel search <query>`               | `zettel_search` with query arg              |
 | `zettel search --status <s>`          | `zettel_search` with status arg             |
 | `zettel search --modified-since <d>`  | `zettel_search` with modified_since arg     |
@@ -76,12 +77,11 @@ digraph organize {
 
 The keyword index (`index` card) is a curated concept → card mapping, inspired by Luhmann's Schlagwort register. It is the primary entry point for the recall skill.
 
-After completing all checks, rebuild the index:
+After completing all checks, draft the index:
 
-1. `zettel links` (no args) to get all active card slugs and their link counts
-2. `zettel read` each card (or at least new/modified ones)
-3. Group cards by concept/topic — use your judgment to create meaningful categories
-4. Write the index card:
+1. Run `zettel index` (or `zettel_index`) — it emits a draft index card with every active card grouped by its frontmatter `category`, titles as placeholder descriptions. Navigation cards are excluded; an existing index's `created` date is preserved
+2. Edit the draft using judgment: rewrite placeholder descriptions into accurate one-liners, move cards between categories where the frontmatter category is wrong
+3. Save the result with `zettel write index`
 
 ```markdown
 ---
