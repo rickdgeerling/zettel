@@ -1,6 +1,7 @@
 package store
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -156,5 +157,68 @@ func TestSlugValidationEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Errorf("validateSlug(%q) = %v, want nil", s, err)
 		}
+	}
+}
+
+func TestMarshalEmitsStandardDelimiters(t *testing.T) {
+	card := &Card{
+		Slug:    "delimiters",
+		Title:   "Delimiters",
+		Created: time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC),
+		Body:    "Body.",
+	}
+
+	content := card.Marshal()
+	if !strings.HasPrefix(content, "---\n") {
+		t.Errorf("Marshal output lacks leading --- delimiter:\n%q", content)
+	}
+	if _, err := UnmarshalCard("delimiters", []byte(content)); err != nil {
+		t.Errorf("Marshal output is not parseable: %v", err)
+	}
+}
+
+// TestMarshalRoundTripStable guards the `zettel read s | zettel write s`
+// pattern: parse(Marshal(c)) must re-marshal byte-identically, so a
+// round-trip never perturbs content the agent did not touch.
+func TestMarshalRoundTripStable(t *testing.T) {
+	card := &Card{
+		Slug:     "stable",
+		Title:    "Stable Card",
+		Created:  time.Date(2025, 1, 15, 12, 30, 0, 0, time.UTC),
+		Modified: time.Date(2025, 1, 20, 8, 0, 0, 0, time.UTC),
+		Source:   "cli",
+		Tags:     []string{"a", "b"},
+		Category: "backend",
+		Body:     "Prose.\n\n## Links\n\n- [[other]]: related\n\nA horizontal rule below.\n\n---\n\nStill body.\n",
+	}
+
+	once := card.Marshal()
+	parsed, err := UnmarshalCard("stable", []byte(once))
+	if err != nil {
+		t.Fatalf("UnmarshalCard failed: %v", err)
+	}
+	if got := parsed.Marshal(); got != once {
+		t.Errorf("Marshal not stable across parse:\ngot:  %q\nwant: %q", got, once)
+	}
+	if parsed.Body != card.Body {
+		t.Errorf("Body not preserved: got %q, want %q", parsed.Body, card.Body)
+	}
+}
+
+// TestUnmarshalCardLegacyFormat: cards written before the standard
+// delimiters lack the leading ---. They must stay readable (and normalize
+// on the next write).
+func TestUnmarshalCardLegacyFormat(t *testing.T) {
+	legacy := "title: Legacy\ncreated: 2025-01-15T00:00:00Z\nsource: cli\n---\nLegacy body.\n"
+
+	parsed, err := UnmarshalCard("legacy", []byte(legacy))
+	if err != nil {
+		t.Fatalf("legacy card not parseable: %v", err)
+	}
+	if parsed.Title != "Legacy" {
+		t.Errorf("Title = %q, want %q", parsed.Title, "Legacy")
+	}
+	if parsed.Body != "Legacy body.\n" {
+		t.Errorf("Body = %q, want %q", parsed.Body, "Legacy body.\n")
 	}
 }

@@ -80,6 +80,11 @@ func (c *Card) Marshal() string {
 	}
 
 	var buf bytes.Buffer
+	// Standard markdown frontmatter delimiters. Read output is a valid
+	// write input, so agents can pipe `zettel read s | zettel write s`
+	// without reconstructing anything — and the on-disk format matches
+	// what every markdown tool expects.
+	buf.WriteString("---\n")
 	data, _ := yaml.Marshal(fm)
 	buf.Write(data)
 	buf.WriteString("---\n")
